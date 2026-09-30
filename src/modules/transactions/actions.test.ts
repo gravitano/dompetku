@@ -166,6 +166,51 @@ describe("createTransactionAction", () => {
     expect(mocks.findFirst.mock.calls[0][0].where.type).toBe("INCOME");
   });
 
+  it("menyimpan pemasukan (E02-US02) dengan jenis INCOME", async () => {
+    const result = await createTransactionAction({
+      ...valid,
+      type: "INCOME",
+      amount: "8000000",
+      note: "Gaji September",
+    });
+
+    expect(result).toEqual({ success: true, data: { id: TRANSACTION_ID } });
+    expect(mocks.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: CATEGORY_ID,
+        userId: USER_ID,
+        type: "INCOME",
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    expect(mocks.create.mock.calls[0][0].data).toMatchObject({
+      userId: USER_ID,
+      type: "INCOME",
+      amount: BigInt(8_000_000),
+      note: "Gaji September",
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("pemasukan dengan kategori pengeluaran → VALIDATION_ERROR di categoryId", async () => {
+    // Kategori ada, tetapi berjenis EXPENSE → tidak cocok dengan filter INCOME.
+    mocks.findFirst.mockImplementation(async ({ where }) =>
+      where.type === "EXPENSE" ? { id: CATEGORY_ID } : null,
+    );
+
+    const result = await createTransactionAction({ ...valid, type: "INCOME" });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        details: [{ field: "categoryId", message: M.categoryInvalid }],
+      },
+    });
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it("kesalahan database → INTERNAL_ERROR dengan pesan Indonesia", async () => {
     mocks.create.mockRejectedValue(new Error("db down"));
 
