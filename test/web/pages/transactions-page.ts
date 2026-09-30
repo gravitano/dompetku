@@ -46,6 +46,13 @@ export function shiftMonth(month: string, offset: number): string {
   return d.toISOString().slice(0, 7);
 }
 
+/** "YYYY-MM" → tanggal terakhir bulan tsb ("YYYY-MM-DD"). */
+export function lastDayOfMonth(month: string): string {
+  const d = new Date(`${shiftMonth(month, 1)}-01T00:00:00Z`);
+  d.setUTCDate(0);
+  return d.toISOString().slice(0, 10);
+}
+
 /** "Rp 1.250.000". */
 export function rupiah(value: number): string {
   return `Rp ${Math.abs(value)

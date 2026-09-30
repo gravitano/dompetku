@@ -6,9 +6,14 @@
  * `test/web/smoke/daftar-transaksi.spec.ts`.
  *
  * Data uji: tiap test membuat akun baru (`createUser`) dan transaksi Background
- * di-insert langsung lewat fixture `db`. Server memakai jam sistem (RSC),
- * sehingga "hari ini" = tanggal hari ini (Asia/Jakarta) dan tanggal Background
- * dibuat relatif terhadapnya; nilai harapan dihitung dari fixture.
+ * di-insert langsung lewat fixture `db`.
+ *
+ * Determinisme tanggal: server memakai jam sistem (RSC), jadi `page.clock`
+ * tidak berlaku. Background ditempatkan di **bulan lalu** (`BASE`, tanggal
+ * tetap 28/25/10 yang ada di semua bulan) dan transaksi "Belanja bulanan" di
+ * hari terakhir **dua bulan lalu** (`OLDER`). Daftar dibuka lewat
+ * `?month=BASE` / tombol ◀ sehingga hasilnya sama di tanggal berapa pun
+ * (termasuk tanggal 1). Skenario bulan berjalan hanya memakai tanggal hari ini.
  */
 import type { Page } from "@playwright/test";
 
@@ -19,44 +24,43 @@ import { jakartaDate } from "../pages/home-page";
 import { TransactionFormPage } from "../pages/transaction-form";
 import {
   dayLabel,
+  lastDayOfMonth,
   monthLabel,
   rupiah,
   shiftMonth,
   TransactionsPage,
 } from "../pages/transactions-page";
 
-const TODAY = jakartaDate(0);
-const CURRENT_MONTH = TODAY.slice(0, 7);
-const DAY = Number(TODAY.slice(8, 10));
-const PREV_MONTH = shiftMonth(CURRENT_MONTH, -1);
-/** Tanggal di bulan berjalan, `daysAgo` hari sebelum hari ini (min. tgl 1). */
-const monthDate = (daysAgo: number) => jakartaDate(-Math.min(daysAgo, DAY - 1));
+const currentMonth = () => jakartaDate(0).slice(0, 7);
+const BASE = shiftMonth(currentMonth(), -1);
+const OLDER = shiftMonth(BASE, -1);
+const on = (day: number) => `${BASE}-${String(day).padStart(2, "0")}`;
 
-/** Background testing.md (tanggal relatif terhadap hari ini). */
+/** Background testing.md: "30 Sep" → BASE-28, "25 Sep" → BASE-25, dst. */
 const BACKGROUND: SeedTransaction[] = [
   {
-    date: PREV_MONTH + "-" + lastDayOf(PREV_MONTH),
+    date: lastDayOfMonth(OLDER),
     type: "EXPENSE",
     category: "Belanja",
     amount: 200_000,
     note: "Belanja bulanan",
   },
   {
-    date: monthDate(20),
+    date: on(10),
     type: "EXPENSE",
     category: "Tagihan",
     amount: 350_000,
     note: "Listrik",
   },
   {
-    date: monthDate(5),
+    date: on(25),
     type: "INCOME",
     category: "Gaji",
     amount: 8_000_000,
     note: "Gaji September",
   },
   {
-    date: TODAY,
+    date: on(28),
     type: "EXPENSE",
     category: "Makan & Minum",
     amount: 25_000,
@@ -64,22 +68,20 @@ const BACKGROUND: SeedTransaction[] = [
   },
   // Dicatat paling akhir → tampil paling atas di tanggal yang sama.
   {
-    date: TODAY,
+    date: on(28),
     type: "EXPENSE",
     category: "Transportasi",
     amount: 18_000,
     note: "Ojek",
   },
 ];
-const CURRENT = BACKGROUND.filter((t) => t.date.startsWith(CURRENT_MONTH));
+const IN_BASE = BACKGROUND.filter((t) => t.date.startsWith(BASE));
 const sum = (rows: SeedTransaction[], type: "INCOME" | "EXPENSE") =>
   rows.filter((t) => t.type === type).reduce((s, t) => s + t.amount, 0);
-
-function lastDayOf(month: string): string {
-  const d = new Date(`${shiftMonth(month, 1)}-01T00:00:00Z`);
-  d.setUTCDate(0);
-  return String(d.getUTCDate()).padStart(2, "0");
-}
+const BASE_TOTALS = {
+  income: sum(IN_BASE, "INCOME"),
+  expense: sum(IN_BASE, "EXPENSE"),
+};
 
 async function expectSummary(
   list: TransactionsPage,
@@ -123,10 +125,21 @@ test.describe("Daftar transaksi dengan filter", () => {
   });
 
   test.describe("@happy-path", () => {
-    test("dibuka dari tab Transaksi: urutan, grup tanggal & baris", async ({
+    test("dibuka dari tab Transaksi: bulan berjalan default, ◀ ke bulan lalu per tanggal", async ({
       page,
+      db,
       isMobile,
     }) => {
+      const today = jakartaDate(0);
+      await db.insertTransactions(user.id, [
+        {
+          date: today,
+          type: "EXPENSE",
+          category: "Hiburan",
+          amount: 60_000,
+          note: "Bioskop",
+        },
+      ]);
       await page.goto("/");
       const shell = new AppShell(page);
       await (
@@ -136,23 +149,35 @@ test.describe("Daftar transaksi dengan filter", () => {
       ).click();
       await expect(page).toHaveURL((url) => url.pathname === "/transactions");
 
-      await expect(list.monthLabel).toHaveText(monthLabel(CURRENT_MONTH));
-      const dates = [...new Set(CURRENT.map((t) => t.date))].toSorted((a, b) =>
-        b.localeCompare(a),
-      );
-      await expect(list.groups).toHaveCount(dates.length);
+      // Default: bulan berjalan saja.
+      await expect(list.monthLabel).toHaveText(monthLabel(today.slice(0, 7)));
+      await expectNotes(list, ["Bioskop"]);
       await expect(
         list.groups.getByTestId("transaction-group-label"),
-      ).toHaveText(dates.map(dayLabel));
+      ).toHaveText([dayLabel(today)]);
+      await expectSummary(list, { income: 0, expense: 60_000 });
+
+      // Bulan lalu: 4 transaksi dalam 3 kelompok, terbaru dulu.
+      await list.monthPrev.click();
+      await expect(list.monthLabel).toHaveText(monthLabel(BASE));
+      await expect(list.rows).toHaveCount(IN_BASE.length);
+      await expect(
+        list.groups.getByTestId("transaction-group-label"),
+      ).toHaveText([on(28), on(25), on(10)].map(dayLabel));
       // Tanggal sama: yang terakhir dicatat di atas.
-      const today = list.group(TODAY);
-      await expect(today.getByTestId("transaction-note")).toHaveText([
+      const day28 = list.group(on(28));
+      await expect(day28.getByTestId("transaction-note")).toHaveText([
         "Ojek",
         "Makan siang",
       ]);
-      await expect(today.getByTestId("transaction-group-total")).toHaveText(
+      await expect(day28.getByTestId("transaction-group-total")).toHaveText(
         `− ${rupiah(43_000)}`,
       );
+      await expect(
+        list.group(on(25)).getByTestId("transaction-group-total"),
+      ).toHaveText(`+ ${rupiah(8_000_000)}`);
+      await expect(page.getByText("Belanja bulanan")).toHaveCount(0);
+      await expectSummary(list, BASE_TOTALS);
 
       // Baris: nama kategori, catatan, dan nominal bertanda.
       const ojek = list.row("Ojek");
@@ -173,42 +198,37 @@ test.describe("Daftar transaksi dengan filter", () => {
       );
     });
 
-    test("catatan kosong → baris menampilkan nama kategori", async ({
-      page,
-      db,
-    }) => {
+    test("catatan kosong → baris menampilkan nama kategori", async ({ db }) => {
       await db.insertTransactions(user.id, [
-        { date: TODAY, type: "EXPENSE", category: "Hiburan", amount: 60_000 },
+        { date: on(28), type: "EXPENSE", category: "Hiburan", amount: 60_000 },
       ]);
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       const row = list.rows.first();
       await expect(row.getByTestId("transaction-note")).toHaveText("Hiburan");
       await expect(row.getByTestId("transaction-category")).toHaveText(
         "Hiburan",
       );
-      await expect(page.getByText("Belanja bulanan")).toHaveCount(0);
     });
 
     test("pindah ke bulan sebelumnya", async ({ page }) => {
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       await list.monthPrev.click();
 
-      await expect(list.monthLabel).toHaveText(monthLabel(PREV_MONTH));
+      await expect(list.monthLabel).toHaveText(monthLabel(OLDER));
       await expect(page).toHaveURL(
-        (url) => url.searchParams.get("month") === PREV_MONTH,
+        (url) => url.searchParams.get("month") === OLDER,
       );
       await expectNotes(list, ["Belanja bulanan"]);
       await expectSummary(list, { income: 0, expense: 200_000 });
       await expect(list.monthNext).toBeEnabled();
 
       await list.monthNext.click();
-      await expect(list.monthLabel).toHaveText(monthLabel(CURRENT_MONTH));
-      await expect(list.rows).toHaveCount(CURRENT.length);
-      await expect(page).toHaveURL((url) => url.search === "");
+      await expect(list.monthLabel).toHaveText(monthLabel(BASE));
+      await expect(list.rows).toHaveCount(IN_BASE.length);
     });
 
     test("filter berdasarkan jenis", async ({ page }) => {
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       await list.applyFilter({ type: "income" });
 
       await expectNotes(list, ["Gaji September"]);
@@ -216,12 +236,14 @@ test.describe("Daftar transaksi dengan filter", () => {
       await expect(list.chip("type")).toHaveText("Pemasukan");
       await expect(list.filterBadge).toHaveText("1");
       await expect(page).toHaveURL(
-        (url) => url.searchParams.get("type") === "income",
+        (url) =>
+          url.searchParams.get("type") === "income" &&
+          url.searchParams.get("month") === BASE,
       );
     });
 
     test("filter berdasarkan beberapa kategori", async () => {
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       await list.applyFilter({ categories: ["makan-minum", "transportasi"] });
 
       await expectNotes(list, ["Makan siang", "Ojek"]);
@@ -232,20 +254,20 @@ test.describe("Daftar transaksi dengan filter", () => {
     });
 
     test("filter tetap berlaku saat pindah bulan", async () => {
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       await list.applyFilter({ categories: ["belanja"] });
       await expect(list.emptyMessage).toHaveText(
         "Tidak ada transaksi yang cocok dengan filter",
       );
 
       await list.monthPrev.click();
-      await expect(list.monthLabel).toHaveText(monthLabel(PREV_MONTH));
+      await expect(list.monthLabel).toHaveText(monthLabel(OLDER));
       await expectNotes(list, ["Belanja bulanan"]);
       await expect(list.chip("belanja")).toBeVisible();
     });
 
     test("menghapus filter lewat chip dan reset", async () => {
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       await list.applyFilter({ type: "expense", categories: ["tagihan"] });
       await expectNotes(list, ["Listrik"]);
 
@@ -259,17 +281,15 @@ test.describe("Daftar transaksi dengan filter", () => {
 
       await list.chipsReset.click();
       await expect(list.chips).toHaveCount(0);
-      await expect(list.rows).toHaveCount(CURRENT.length);
+      await expect(list.rows).toHaveCount(IN_BASE.length);
       await expect(list.filterBadge).toHaveCount(0);
-      await expectSummary(list, {
-        income: sum(CURRENT, "INCOME"),
-        expense: sum(CURRENT, "EXPENSE"),
-      });
+      await expect(list.monthLabel).toHaveText(monthLabel(BASE));
+      await expectSummary(list, BASE_TOTALS);
     });
 
     test("kategori terarsip tetap bisa difilter", async ({ db }) => {
       await db.archiveCategory(user.id, "Tagihan");
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       await list.openFilter();
 
       const archived = list.page.getByTestId("filter-category-group-archived");
@@ -312,15 +332,15 @@ test.describe("Daftar transaksi dengan filter", () => {
       db,
     }) => {
       const belanja = await db.getCategoryId(user.id, "Belanja");
-      await list.goto(`?month=${PREV_MONTH}&category=${belanja}`);
+      await list.goto(`?month=${OLDER}&category=${belanja}`);
 
-      await expect(list.monthLabel).toHaveText(monthLabel(PREV_MONTH));
+      await expect(list.monthLabel).toHaveText(monthLabel(OLDER));
       await expect(list.chip("belanja")).toHaveText("Belanja");
       await expectNotes(list, ["Belanja bulanan"]);
 
       // Bertahan saat refresh.
       await page.reload();
-      await expect(list.monthLabel).toHaveText(monthLabel(PREV_MONTH));
+      await expect(list.monthLabel).toHaveText(monthLabel(OLDER));
       await expect(list.chip("belanja")).toBeVisible();
       await expectNotes(list, ["Belanja bulanan"]);
 
@@ -329,16 +349,16 @@ test.describe("Daftar transaksi dengan filter", () => {
       await expect(list.chips).toHaveCount(0);
       await expect(page).toHaveURL(
         (url) =>
-          url.searchParams.get("month") === PREV_MONTH &&
+          url.searchParams.get("month") === OLDER &&
           !url.searchParams.has("category"),
       );
-      await expect(list.monthLabel).toHaveText(monthLabel(PREV_MONTH));
+      await expect(list.monthLabel).toHaveText(monthLabel(OLDER));
     });
 
     test("tap baris membuka detail transaksi, kembali ke daftar terfilter", async ({
       page,
     }) => {
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       await list.applyFilter({ categories: ["tagihan"] });
       await expect(page).toHaveURL((u) => u.searchParams.has("category"));
       await expectNotes(list, ["Listrik"]);
@@ -360,13 +380,36 @@ test.describe("Daftar transaksi dengan filter", () => {
         "Listrik",
       );
 
+      // Kembali memakai filter yang dibawa tautan (bukan riwayat browser).
       await page.getByTestId("transaction-detail-back").click();
       await expect(page).toHaveURL(url);
       await expect(list.chip("tagihan")).toBeVisible();
+      await expectNotes(list, ["Listrik"]);
+    });
+
+    test("detail dibuka lewat tautan langsung → Kembali ke daftar bulan transaksi", async ({
+      page,
+      db,
+    }) => {
+      const listrik = (await db.getTransactions(user.id)).find(
+        (t) => t.note === "Listrik",
+      )!;
+      // Tab baru tanpa riwayat daftar sebelumnya.
+      await page.goto(`/transactions/${listrik.id}`);
+      await page.getByTestId("transaction-detail-back").click();
+
+      await expect(page).toHaveURL(
+        (url) =>
+          url.pathname === "/transactions" &&
+          url.searchParams.get("month") === BASE,
+      );
+      await expect(list.monthLabel).toHaveText(monthLabel(BASE));
+      await expect(list.chips).toHaveCount(0);
     });
 
     test("transaksi baru langsung muncul tanpa reload", async ({ page }) => {
       await list.goto();
+      await expect(list.emptyMessage).toBeVisible();
       const form = new TransactionFormPage(page);
       await form.addExpense({
         amount: "12000",
@@ -376,12 +419,9 @@ test.describe("Daftar transaksi dengan filter", () => {
 
       await expect(form.toast("Pengeluaran tersimpan")).toBeVisible();
       await expect(
-        list.group(TODAY).getByTestId("transaction-note").first(),
-      ).toHaveText("Bioskop");
-      await expectSummary(list, {
-        income: sum(CURRENT, "INCOME"),
-        expense: sum(CURRENT, "EXPENSE") + 12_000,
-      });
+        list.group(jakartaDate(0)).getByTestId("transaction-note"),
+      ).toHaveText(["Bioskop"]);
+      await expectSummary(list, { income: 0, expense: 12_000 });
     });
   });
 
@@ -389,27 +429,30 @@ test.describe("Daftar transaksi dengan filter", () => {
     test("tidak bisa pindah ke bulan setelah bulan berjalan", async ({
       page,
     }) => {
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
+      await expect(list.monthNext).toBeEnabled();
+      await list.monthNext.click();
+      await expect(list.monthLabel).toHaveText(monthLabel(currentMonth()));
       await expect(list.monthNext).toBeDisabled();
 
       // Bulan masa depan di URL → bulan berjalan.
-      await list.goto(`?month=${shiftMonth(CURRENT_MONTH, 1)}`);
-      await expect(list.monthLabel).toHaveText(monthLabel(CURRENT_MONTH));
+      await list.goto(`?month=${shiftMonth(currentMonth(), 1)}`);
+      await expect(list.monthLabel).toHaveText(monthLabel(currentMonth()));
       await expect(list.monthNext).toBeDisabled();
-      await expect(page.getByText("Belanja bulanan")).toHaveCount(0);
+      await expect(page.getByText("Listrik")).toHaveCount(0);
     });
 
     test("parameter URL tidak valid diabaikan", async () => {
       await list.goto("?month=abc&type=transfer&category=bukan-uuid");
-      await expect(list.monthLabel).toHaveText(monthLabel(CURRENT_MONTH));
+      await expect(list.monthLabel).toHaveText(monthLabel(currentMonth()));
       await expect(list.chips).toHaveCount(0);
-      await expect(list.rows).toHaveCount(CURRENT.length);
+      await expect(list.filterBadge).toHaveCount(0);
     });
   });
 
   test.describe("@empty-state", () => {
     test("bulan tanpa transaksi", async ({ page }) => {
-      const empty = shiftMonth(CURRENT_MONTH, -2);
+      const empty = shiftMonth(OLDER, -1);
       await list.goto(`?month=${empty}`);
 
       await expect(list.monthLabel).toHaveText(monthLabel(empty));
@@ -425,7 +468,7 @@ test.describe("Daftar transaksi dengan filter", () => {
     });
 
     test("filter tanpa hasil", async () => {
-      await list.goto();
+      await list.goto(`?month=${BASE}`);
       await list.applyFilter({ categories: ["kesehatan"] });
 
       await expect(list.emptyMessage).toHaveText(
@@ -435,7 +478,7 @@ test.describe("Daftar transaksi dengan filter", () => {
       await expectSummary(list, { income: 0, expense: 0 });
 
       await list.emptyReset.click();
-      await expect(list.rows).toHaveCount(CURRENT.length);
+      await expect(list.rows).toHaveCount(IN_BASE.length);
       await expect(list.chips).toHaveCount(0);
     });
   });
@@ -449,7 +492,7 @@ test.describe("Daftar transaksi dengan filter", () => {
       const ani = await createUser("ani", "Ani Wijaya");
       await db.insertTransactions(ani.id, [
         {
-          date: TODAY,
+          date: on(28),
           type: "EXPENSE",
           category: "Belanja",
           amount: 999_000,
@@ -459,18 +502,15 @@ test.describe("Daftar transaksi dengan filter", () => {
       const aniBelanja = await db.getCategoryId(ani.id, "Belanja");
       const [aniTransaction] = await db.getTransactions(ani.id);
 
-      await list.goto();
-      await expect(list.rows).toHaveCount(CURRENT.length);
+      await list.goto(`?month=${BASE}`);
+      await expect(list.rows).toHaveCount(IN_BASE.length);
       await expect(page.getByText("Belanja Ani")).toHaveCount(0);
-      await expectSummary(list, {
-        income: sum(CURRENT, "INCOME"),
-        expense: sum(CURRENT, "EXPENSE"),
-      });
+      await expectSummary(list, BASE_TOTALS);
 
       // Id kategori milik user lain di URL diabaikan (tanpa chip / data).
-      await list.goto(`?category=${aniBelanja}`);
+      await list.goto(`?month=${BASE}&category=${aniBelanja}`);
       await expect(list.chips).toHaveCount(0);
-      await expect(list.rows).toHaveCount(CURRENT.length);
+      await expect(list.rows).toHaveCount(IN_BASE.length);
       await expect(page.getByText("Belanja Ani")).toHaveCount(0);
 
       // Detail transaksi milik user lain → tidak ditemukan.
@@ -487,22 +527,29 @@ test.describe("Daftar transaksi dengan filter", () => {
 test.describe("Daftar transaksi — pagination & error", () => {
   const COUNT = 120;
   const AMOUNT = 10_000;
+  const PER_DAY = 12;
+  /** Semua baris dicatat pada detik yang sama → urutan memakai id (tie-break). */
+  const SAME_CREATED_AT = new Date("2026-01-01T00:00:00Z");
+  /** Baris ke-i jatuh di tanggal BASE-(28 − ⌊i/12⌋): 28, 27, …, 19. */
+  const dateOf = (i: number) => on(28 - Math.floor(i / PER_DAY));
+  /** Grup 24 = baris 48–59 → terpotong antara halaman 1 (50) dan 2. */
+  const SPLIT_DATE = dateOf(48);
 
   async function seedMany(db: TestDb, userId: string) {
-    // 120 pengeluaran tersebar di tanggal bulan berjalan (≤ hari ini).
     await db.insertTransactions(
       userId,
       Array.from({ length: COUNT }, (_, i) => ({
-        date: monthDate(Math.floor(i / 10)),
+        date: dateOf(i),
         type: "EXPENSE" as const,
         category: "Makan & Minum",
         amount: AMOUNT,
         note: `Jajan ${String(i + 1).padStart(3, "0")}`,
+        createdAt: SAME_CREATED_AT,
       })),
     );
   }
 
-  test("@pagination infinite scroll dengan ringkasan tetap akurat", async ({
+  test("@pagination infinite scroll dengan ringkasan & total harian tetap akurat", async ({
     page,
     db,
     createUser,
@@ -512,21 +559,46 @@ test.describe("Daftar transaksi — pagination & error", () => {
     await seedMany(db, user.id);
     await loginAs(user);
     const list = new TransactionsPage(page);
-    await list.goto();
+    await list.goto(`?month=${BASE}`);
 
     await expect(list.rows).toHaveCount(50);
     await expect(list.summaryExpense).toHaveText(rupiah(COUNT * AMOUNT));
     await expect(list.listEnd).toHaveCount(0);
+    // Grup yang terpotong: baru 2 dari 12 baris tampil, total sudah penuh.
+    const split = list.group(SPLIT_DATE);
+    await expect(
+      split.locator('[data-testid^="transaction-row-"]'),
+    ).toHaveCount(2);
+    await expect(split.getByTestId("transaction-group-total")).toHaveText(
+      `− ${rupiah(PER_DAY * AMOUNT)}`,
+    );
 
     await list.sentinel.scrollIntoViewIfNeeded();
     await expect(list.rows).toHaveCount(100);
+    // Setelah load-more: tetap satu grup, 12 baris, total tidak berubah.
+    await expect(list.group(SPLIT_DATE)).toHaveCount(1);
+    await expect(
+      split.locator('[data-testid^="transaction-row-"]'),
+    ).toHaveCount(PER_DAY);
+    await expect(split.getByTestId("transaction-group-total")).toHaveText(
+      `− ${rupiah(PER_DAY * AMOUNT)}`,
+    );
+
     await list.sentinel.scrollIntoViewIfNeeded();
     await expect(list.rows).toHaveCount(COUNT);
     await expect(list.listEnd).toHaveText("Semua transaksi sudah ditampilkan");
+    await expect(list.groups).toHaveCount(COUNT / PER_DAY);
+    for (const total of await list.groups
+      .getByTestId("transaction-group-total")
+      .allTextContents()) {
+      expect(total).toBe(`− ${rupiah(PER_DAY * AMOUNT)}`);
+    }
 
-    // Urutan stabil tanpa duplikat: sama dengan urutan database.
+    // createdAt identik: urutan stabil (id) tanpa duplikat/terlewat antar
+    // halaman — sama dengan urutan database.
     const expected = (await db.getTransactions(user.id)).map((t) => t.note);
     expect(await list.notes()).toEqual(expected);
+    expect(new Set(expected).size).toBe(COUNT);
     await expect(list.summaryExpense).toHaveText(rupiah(COUNT * AMOUNT));
   });
 
@@ -540,7 +612,7 @@ test.describe("Daftar transaksi — pagination & error", () => {
     await seedMany(db, user.id);
     await loginAs(user);
     const list = new TransactionsPage(page);
-    await list.goto();
+    await list.goto(`?month=${BASE}`);
     await expect(list.rows).toHaveCount(50);
 
     await failServerActions(page);
