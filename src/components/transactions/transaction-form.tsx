@@ -246,6 +246,7 @@ export function TransactionForm({
           render={({ field }) => (
             <TransactionTypeToggle
               value={field.value}
+              disabled={pending}
               onChange={(next) => {
                 if (next === field.value) return;
                 // UX-01/UX-05: kategori jenis lain dikosongkan (beserta

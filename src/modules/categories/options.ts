@@ -59,3 +59,66 @@ export function groupCategoryOptions(
     INCOME: sorted.filter((c) => c.type === "INCOME"),
   };
 }
+
+/** Kategori di panel filter daftar transaksi (E02-US03), termasuk terarsip. */
+export type FilterCategory = {
+  id: string;
+  name: string;
+  type: CategoryType;
+  icon: string | null;
+  isDefault: boolean;
+  archived: boolean;
+  /**
+   * Kunci unik untuk `data-testid="filter-category-<key>"` / `filter-chip-<key>`:
+   * slug nama; bila bentrok (mis. "Lainnya" di dua jenis) ditambah jenis
+   * (`lainnya-expense`), lalu `-archived` / nomor urut bila masih bentrok.
+   */
+  key: string;
+};
+
+/**
+ * Urutkan kategori filter: aktif dulu (urutan form per jenis: pengeluaran lalu
+ * pemasukan), lalu kategori terarsip (alfabetis) — dikelompokkan "Diarsipkan"
+ * di panel filter.
+ */
+export function buildFilterCategories(
+  categories: ReadonlyArray<
+    Omit<CategoryOption, "slug"> & { archivedAt: Date | null }
+  >,
+): FilterCategory[] {
+  const typeRank = (type: CategoryType) => (type === "EXPENSE" ? 0 : 1);
+  const sorted = [...categories].sort(
+    (a, b) =>
+      Number(!!a.archivedAt) - Number(!!b.archivedAt) ||
+      (a.archivedAt
+        ? a.name.localeCompare(b.name, "id") ||
+          typeRank(a.type) - typeRank(b.type)
+        : typeRank(a.type) - typeRank(b.type) || compareCategories(a, b)),
+  );
+
+  const slugCount = new Map<string, number>();
+  for (const c of sorted) {
+    const slug = categorySlug(c.name) || "kategori";
+    slugCount.set(slug, (slugCount.get(slug) ?? 0) + 1);
+  }
+
+  const used = new Set<string>();
+  return sorted.map((c) => {
+    const slug = categorySlug(c.name) || "kategori";
+    const typed = `${slug}-${c.type.toLowerCase()}`;
+    let key = (slugCount.get(slug) ?? 0) > 1 ? typed : slug;
+    if (used.has(key)) key = `${typed}${c.archivedAt ? "-archived" : ""}`;
+    const stem = key;
+    for (let n = 2; used.has(key); n++) key = `${stem}-${n}`;
+    used.add(key);
+    return {
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      icon: c.icon,
+      isDefault: c.isDefault,
+      archived: !!c.archivedAt,
+      key,
+    };
+  });
+}

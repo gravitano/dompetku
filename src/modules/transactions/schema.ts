@@ -8,7 +8,11 @@
 import { z } from "zod";
 
 import { formatRupiah } from "~/lib/format";
-import { parseDateOnly, toJakartaDateString } from "~/lib/date";
+import {
+  currentMonthKey,
+  parseDateOnly,
+  toJakartaDateString,
+} from "~/lib/date";
 
 export const TRANSACTION_TYPES = ["EXPENSE", "INCOME"] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
@@ -115,3 +119,217 @@ export const TRANSACTION_FIELDS: readonly TransactionField[] = [
 export function isTransactionField(field: string): field is TransactionField {
   return (TRANSACTION_FIELDS as readonly string[]).includes(field);
 }
+
+// ---------------------------------------------------------------------------
+// Daftar transaksi dengan filter (E02-US03)
+// ---------------------------------------------------------------------------
+
+/** Jumlah transaksi per halaman infinite scroll (AC 9). */
+export const TRANSACTION_PAGE_SIZE = 50;
+/** Batas jumlah kategori di filter (melindungi query dari URL yang sangat panjang). */
+export const TRANSACTION_FILTER_MAX_CATEGORIES = 50;
+/** Bulan paling awal yang bisa dibuka (sejalan dengan `TRANSACTION_DATE_MIN`). */
+export const TRANSACTION_MONTH_MIN = TRANSACTION_DATE_MIN.slice(0, 7);
+
+export const TRANSACTION_LIST_MESSAGES = {
+  loadError: "Gagal memuat transaksi.",
+  retry: "Coba lagi",
+  emptyFiltered: "Tidak ada transaksi yang cocok dengan filter",
+  end: "Semua transaksi sudah ditampilkan",
+  notFound: "Transaksi tidak ditemukan",
+} as const;
+
+/** Nama parameter URL `/transactions` (kontrak dengan E04-US02). */
+export const TRANSACTION_LIST_PARAMS = {
+  month: "month",
+  type: "type",
+  category: "category",
+} as const;
+
+/** Nilai `type` di URL (huruf kecil) ↔ enum. */
+export const TRANSACTION_TYPE_PARAM: Record<TransactionType, string> = {
+  EXPENSE: "expense",
+  INCOME: "income",
+};
+
+/**
+ * Filter daftar transaksi yang sudah divalidasi. `month` "YYYY-MM"
+ * (Asia/Jakarta), `type` null = Semua, `categoryIds` kosong = semua kategori.
+ */
+export type TransactionListFilter = {
+  month: string;
+  type: TransactionType | null;
+  categoryIds: string[];
+};
+
+export type SearchParamsInput =
+  URLSearchParams | Record<string, string | string[] | undefined>;
+
+function getAllParams(params: SearchParamsInput, name: string): string[] {
+  if (params instanceof URLSearchParams) return params.getAll(name);
+  const value = params[name];
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+const uuidSchema = z.uuid();
+const monthKeySchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+
+function isMonthKey(value: string): boolean {
+  return monthKeySchema.safeParse(value).success;
+}
+
+/** Bulan valid & dalam batas [TRANSACTION_MONTH_MIN, bulan berjalan]. */
+function clampMonth(value: string | undefined, current: string): string {
+  if (!value || !isMonthKey(value)) return current;
+  if (value > current) return current;
+  if (value < TRANSACTION_MONTH_MIN) return TRANSACTION_MONTH_MIN;
+  return value;
+}
+
+function parseTypeParam(value: string | undefined): TransactionType | null {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "expense") return "EXPENSE";
+  if (normalized === "income") return "INCOME";
+  return null;
+}
+
+/**
+ * Parse search params `/transactions` → filter (AC 7, 12). Nilai tidak valid
+ * diabaikan, bukan error: bulan salah/masa depan → bulan berjalan, jenis tak
+ * dikenal → Semua, id kategori bukan UUID dibuang. Kepemilikan kategori
+ * divalidasi terpisah (`normalizeTransactionListFilter`) karena butuh data user.
+ */
+export function parseTransactionListParams(
+  params: SearchParamsInput,
+  currentMonth: string = currentMonthKey(),
+): TransactionListFilter {
+  const P = TRANSACTION_LIST_PARAMS;
+  const categoryIds = new Set<string>();
+  for (const raw of getAllParams(params, P.category)) {
+    for (const part of raw.split(",")) {
+      const id = part.trim().toLowerCase();
+      if (uuidSchema.safeParse(id).success) categoryIds.add(id);
+    }
+  }
+  return {
+    month: clampMonth(getAllParams(params, P.month)[0], currentMonth),
+    type: parseTypeParam(getAllParams(params, P.type)[0]),
+    categoryIds: [...categoryIds].slice(0, TRANSACTION_FILTER_MAX_CATEGORIES),
+  };
+}
+
+/**
+ * Search string untuk filter (tanpa "?"); `month` dihilangkan bila bulan
+ * berjalan sehingga daftar default tetap `/transactions`.
+ */
+export function transactionListSearch(
+  filter: Partial<TransactionListFilter>,
+  currentMonth: string = currentMonthKey(),
+): string {
+  const P = TRANSACTION_LIST_PARAMS;
+  const params = new URLSearchParams();
+  if (filter.month && filter.month !== currentMonth) {
+    params.set(P.month, filter.month);
+  }
+  if (filter.type) params.set(P.type, TRANSACTION_TYPE_PARAM[filter.type]);
+  for (const id of filter.categoryIds ?? []) params.append(P.category, id);
+  return params.toString();
+}
+
+/**
+ * Tautan ke daftar transaksi terfilter, mis. dari grafik Laporan (E04-US02):
+ * `transactionListHref({ month: "2026-09", type: "EXPENSE", categoryIds: [id] })`.
+ */
+export function transactionListHref(
+  filter: Partial<TransactionListFilter>,
+  currentMonth: string = currentMonthKey(),
+): string {
+  const search = transactionListSearch(filter, currentMonth);
+  return search ? `/transactions?${search}` : "/transactions";
+}
+
+/** Penanda detail dibuka dari daftar (`?from=list`), lihat `transactionDetailHref`. */
+export const FROM_LIST_PARAM = { name: "from", value: "list" } as const;
+
+/**
+ * Tautan detail transaksi dari daftar: membawa penanda `from=list` + filter
+ * daftar yang aktif, agar tombol Kembali kembali ke daftar yang sama tanpa
+ * bergantung pada riwayat browser.
+ */
+export function transactionDetailHref(
+  id: string,
+  filter: Partial<TransactionListFilter>,
+  currentMonth: string = currentMonthKey(),
+): string {
+  const search = transactionListSearch(filter, currentMonth);
+  const from = `${FROM_LIST_PARAM.name}=${FROM_LIST_PARAM.value}`;
+  return `/transactions/${id}?${from}${search ? `&${search}` : ""}`;
+}
+
+/**
+ * Tujuan tombol Kembali di detail: daftar dengan filter asal bila dibuka dari
+ * daftar (`from=list`, filter divalidasi ulang — hanya path internal
+ * `/transactions`), selain itu daftar bulan transaksi tsb (`fallbackMonth`).
+ */
+export function detailBackHref(
+  params: SearchParamsInput,
+  fallbackMonth: string,
+  currentMonth: string = currentMonthKey(),
+): string {
+  const fromList =
+    getAllParams(params, FROM_LIST_PARAM.name)[0] === FROM_LIST_PARAM.value;
+  const filter = fromList
+    ? parseTransactionListParams(params, currentMonth)
+    : { month: fallbackMonth };
+  return transactionListHref(filter, currentMonth);
+}
+
+/** Kategori minimal untuk validasi filter. */
+export type FilterableCategory = { id: string; type: TransactionType };
+
+/**
+ * Buang id kategori yang bukan milik user (tidak dikenal = diabaikan, tanpa
+ * membocorkan data) dan — bila jenis dipilih — kategori jenis lain (UX-07).
+ */
+export function normalizeTransactionListFilter(
+  filter: TransactionListFilter,
+  categories: readonly FilterableCategory[],
+): TransactionListFilter {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const categoryIds = filter.categoryIds.filter((id) => {
+    const category = byId.get(id);
+    return !!category && (!filter.type || category.type === filter.type);
+  });
+  return { ...filter, categoryIds };
+}
+
+/** Jumlah filter aktif (badge tombol Filter): jenis + tiap kategori. */
+export function countActiveFilters(filter: TransactionListFilter): number {
+  return (filter.type ? 1 : 0) + filter.categoryIds.length;
+}
+
+/** Posisi terakhir yang sudah dimuat (urutan tanggal, createdAt, id menurun). */
+export const transactionCursorSchema = z.object({
+  date: z.string().refine(isValidDateOnly),
+  createdAt: z.iso.datetime(),
+  id: z.uuid(),
+});
+export type TransactionCursor = z.infer<typeof transactionCursorSchema>;
+
+/** Input Server Action halaman berikutnya (infinite scroll). */
+export const transactionPageRequestSchema = z.object({
+  filter: z.object({
+    month: z
+      .string()
+      .refine(isMonthKey)
+      .refine((value) => value >= TRANSACTION_MONTH_MIN)
+      .refine((value) => value <= currentMonthKey()),
+    type: z.enum(TRANSACTION_TYPES).nullable(),
+    categoryIds: z.array(z.uuid()).max(TRANSACTION_FILTER_MAX_CATEGORIES),
+  }),
+  cursor: transactionCursorSchema,
+});
+export type TransactionPageRequest = z.infer<
+  typeof transactionPageRequestSchema
+>;

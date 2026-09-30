@@ -42,6 +42,17 @@ export function randomTestIp(): string {
 }
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
+  /**
+   * `X-Forwarded-For` acak per test untuk semua request browser context
+   * (navigasi, Server Action, `page.request`, juga `browser.newContext()`).
+   * Di `next start` (production) limiter Server Action login/registrasi
+   * memakai IP dari header ini; tanpa header semua test berbagi satu bucket
+   * dan saling memicu RATE_LIMITED. Limiter produk tetap utuh — satu test tetap
+   * satu "klien" dengan IP yang sama.
+   */
+  extraHTTPHeaders: async ({ extraHTTPHeaders }, use) => {
+    await use({ ...extraHTTPHeaders, "x-forwarded-for": randomTestIp() });
+  },
   db: [
     async ({}, use) => {
       const db = new TestDb();

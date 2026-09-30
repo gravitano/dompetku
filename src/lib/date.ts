@@ -94,3 +94,41 @@ export function formatDate(date: Date): string {
 export function formatMonthYear(date: Date): string {
   return monthYearFormatter.format(date);
 }
+
+const WEEKDAYS = [
+  "Minggu",
+  "Senin",
+  "Selasa",
+  "Rabu",
+  "Kamis",
+  "Jumat",
+  "Sabtu",
+] as const;
+
+/** Date-only → "Rabu, 30 Sep 2026" (header grup tanggal daftar transaksi). */
+export function formatDayLabel(date: Date): string {
+  return `${WEEKDAYS[date.getUTCDay()]}, ${formatDate(date)}`;
+}
+
+/** Date-only → "YYYY-MM" (kunci bulan di URL daftar transaksi). */
+export function formatMonthKey(date: Date): string {
+  return formatDateOnly(date).slice(0, 7);
+}
+
+/** "YYYY-MM" → tanggal 1 bulan tsb (date-only). Format salah → error. */
+export function parseMonthKey(value: string): Date {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) {
+    throw new Error(`Format bulan tidak valid: ${value}`);
+  }
+  return parseDateOnly(`${value}-01`);
+}
+
+/** "YYYY-MM" bulan berjalan (Asia/Jakarta). */
+export function currentMonthKey(now: Date = new Date()): string {
+  return toJakartaDateString(now).slice(0, 7);
+}
+
+/** Geser "YYYY-MM" sebanyak `months` bulan. */
+export function shiftMonthKey(value: string, months: number): string {
+  return formatMonthKey(addMonths(parseMonthKey(value), months));
+}

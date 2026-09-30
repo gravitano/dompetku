@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   addMonths,
+  currentMonthKey,
   currentMonthStart,
   endOfMonth,
   formatDate,
   formatDateOnly,
+  formatDayLabel,
+  formatMonthKey,
   formatMonthYear,
   parseDateOnly,
+  parseMonthKey,
+  shiftMonthKey,
   startOfMonth,
   toJakartaDateString,
   today,
@@ -74,5 +79,39 @@ describe("format tampilan", () => {
 
   it('formatMonthYear → "September 2026"', () => {
     expect(formatMonthYear(parseDateOnly("2026-09-01"))).toBe("September 2026");
+  });
+});
+
+describe("formatDayLabel", () => {
+  it("nama hari Indonesia + tanggal singkat", () => {
+    expect(formatDayLabel(parseDateOnly("2026-09-30"))).toBe(
+      "Rabu, 30 Sep 2026",
+    );
+    expect(formatDayLabel(parseDateOnly("2026-09-27"))).toBe(
+      "Minggu, 27 Sep 2026",
+    );
+    expect(formatDayLabel(parseDateOnly("2026-08-31"))).toBe(
+      "Senin, 31 Agu 2026",
+    );
+  });
+});
+
+describe("kunci bulan YYYY-MM", () => {
+  it("format, parse, dan geser bulan (lintas tahun)", () => {
+    expect(formatMonthKey(parseDateOnly("2026-09-30"))).toBe("2026-09");
+    expect(formatDateOnly(parseMonthKey("2026-02"))).toBe("2026-02-01");
+    expect(shiftMonthKey("2026-01", -1)).toBe("2025-12");
+    expect(shiftMonthKey("2026-12", 1)).toBe("2027-01");
+  });
+
+  it("menolak format tidak valid", () => {
+    for (const value of ["2026-13", "2026-9", "2026-00", "abc", "2026-09-01"]) {
+      expect(() => parseMonthKey(value)).toThrow();
+    }
+  });
+
+  it("bulan berjalan mengikuti zona Asia/Jakarta", () => {
+    expect(currentMonthKey(new Date("2026-09-30T18:30:00Z"))).toBe("2026-10");
+    expect(currentMonthKey(new Date("2026-09-30T16:59:59Z"))).toBe("2026-09");
   });
 });
