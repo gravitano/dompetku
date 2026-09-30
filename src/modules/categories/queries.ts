@@ -4,9 +4,11 @@ import { prisma } from "~/lib/prisma";
 
 import {
   buildFilterCategories,
+  buildManagedCategories,
   groupCategoryOptions,
   type CategoryOptionsByType,
   type FilterCategory,
+  type ManagedCategory,
 } from "./options";
 
 /**
@@ -42,4 +44,31 @@ export async function getFilterCategories(
     },
   });
   return buildFilterCategories(categories);
+}
+
+/**
+ * Semua kategori milik `userId` (aktif & terarsip) beserta jumlah transaksi
+ * semua waktu — untuk halaman Kelola Kategori (E02-US05).
+ */
+export async function getManagedCategories(
+  userId: string,
+): Promise<ManagedCategory[]> {
+  const categories = await prisma.category.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      icon: true,
+      isDefault: true,
+      archivedAt: true,
+      _count: { select: { transactions: true } },
+    },
+  });
+  return buildManagedCategories(
+    categories.map(({ _count, ...c }) => ({
+      ...c,
+      transactionCount: _count.transactions,
+    })),
+  );
 }
