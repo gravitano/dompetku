@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-02---pencatatan-transaksi/e02-us04--ubah-hapus-transaksi---story.md
-status: in-progress
+status: implemented
 branch: dev/e02-us04--ubah-hapus-transaksi
 ---
 
@@ -45,8 +45,10 @@ hanya menampilkan detail read-only dan baris Beranda belum bisa ditekan. Accepta
     (Transaksi/Beranda) membuka detail sebagai **bottom sheet (HP) / dialog (desktop)** di atas halaman asal, URL
     tetap `/transactions/<id>?from=...`. `@modal/default.tsx`, `@modal/page.tsx`, `@modal/[...catchAll]/page.tsx`
     mengembalikan `null` agar modal tertutup saat navigasi.
-  - Tautan langsung / refresh `/transactions/<id>` merender sheet yang sama (halaman penuh); transaksi user lain / id
-    tidak valid → `not-found.tsx` "Transaksi tidak ditemukan" + **Kembali ke daftar** (di modal: isi sheet yang sama).
+  - Tautan langsung / refresh `/transactions/<id>` merender sheet yang sama (halaman penuh). Transaksi user lain /
+    sudah dihapus / id tidak valid → isi sheet "Transaksi tidak ditemukan" + **Kembali ke daftar** (sama di modal dan
+    halaman; `not-found.tsx` detail dihapus agar revalidate setelah hapus tidak sempat menampilkan halaman 404 —
+    data yang tampil dibekukan selama menghapus).
   - Tutup tanpa perubahan: `router.back()` bila dibuka sebagai modal, selain itu `router.replace(backHref)`. Setelah
     simpan/hapus selalu `router.replace(backHref)` (daftar asal beserta filter / Beranda) sehingga data terbaru dimuat
     dan tombol Back tidak kembali ke transaksi yang sudah dihapus.
