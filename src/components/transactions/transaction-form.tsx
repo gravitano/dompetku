@@ -2,7 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CircleAlertIcon, LoaderCircleIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   Controller,
   useForm,
@@ -23,12 +29,20 @@ import {
   toJakartaDateString,
 } from "~/lib/date";
 import { cn } from "~/lib/utils";
-import type { CategoryOptionsByType } from "~/modules/categories/options";
-import { createTransactionAction } from "~/modules/transactions/actions";
+import type {
+  CategoryOption,
+  CategoryOptionsByType,
+} from "~/modules/categories/options";
+import {
+  createTransactionAction,
+  updateTransactionAction,
+} from "~/modules/transactions/actions";
+import type { TransactionListItem } from "~/modules/transactions/list";
 import {
   isTransactionField,
   NOTE_MAX_LENGTH,
   TRANSACTION_DATE_MIN,
+  TRANSACTION_EDIT_MESSAGES,
   TRANSACTION_MESSAGES,
   transactionSchema,
   type TransactionFormValues,
@@ -51,8 +65,37 @@ const SUBMIT_TONE: Record<TransactionType, string> = {
     "bg-income-action text-income-action-foreground hover:bg-income-action/90",
 };
 
+const RECORDED_TIME = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "Asia/Jakarta",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+/** "Dicatat 30 Sep 2026, 12:15" (waktu pencatatan, Asia/Jakarta). */
+function describeRecordedAt(createdAt: string): string {
+  const recordedAt = new Date(createdAt);
+  const date = formatDate(parseDateOnly(toJakartaDateString(recordedAt)));
+  return `Dicatat ${date}, ${RECORDED_TIME.format(recordedAt)}`;
+}
+
 type TransactionFormProps = {
+  /** Kategori aktif (tanpa terarsip) sebagai pilihan. */
   categories: CategoryOptionsByType;
+  /**
+   * Mode ubah (E02-US04): form terisi data transaksi ini, tombol "Simpan
+   * perubahan" aktif hanya bila ada perubahan. Tanpa prop ini = mode catat.
+   */
+  transaction?: TransactionListItem;
+  /**
+   * Mode ubah: kategori transaksi bila sudah terarsip (`archived: true`) —
+   * tetap tampil & boleh dipertahankan, tidak menjadi pilihan baru (AC 6).
+   */
+  archivedCategory?: CategoryOption;
+  /** Nonaktifkan seluruh form dari luar (mis. saat menghapus). */
+  busy?: boolean;
+  /** Aksi tambahan di bawah tombol simpan (mis. "Hapus transaksi"). */
+  footer?: ReactNode;
   /** Tombol ✕ / Batal di header (UX-07). */
   onCancel: () => void;
   onSaved: (type: TransactionType) => void;
@@ -99,6 +142,27 @@ function FieldMessage({ id, error }: { id: string; error?: FieldError }) {
 }
 
 /**
+ * Pilihan kategori mode ubah: kategori terarsip milik transaksi hanya tampil
+ * (berlabel "Diarsipkan") selama masih menjadi pilihan saat ini — setelah
+ * diganti / jenis diubah, tidak bisa dipilih ulang (E02-US04 AC 6).
+ */
+function withCurrentCategory(
+  options: CategoryOption[],
+  archivedCategory: CategoryOption | undefined,
+  current: { type: TransactionType; categoryId: string },
+): CategoryOption[] {
+  if (
+    !archivedCategory ||
+    current.type !== archivedCategory.type ||
+    current.categoryId !== archivedCategory.id ||
+    options.some((option) => option.id === archivedCategory.id)
+  ) {
+    return options;
+  }
+  return [archivedCategory, ...options];
+}
+
+/**
  * Form catat transaksi (E02-US01; mode pemasukan E02-US02 lewat toggle jenis,
  * default Pengeluaran). Validasi dijalankan
  * saat Simpan lalu ulang per field saat diubah; data yang sudah diisi tidak
@@ -106,6 +170,10 @@ function FieldMessage({ id, error }: { id: string; error?: FieldError }) {
  */
 export function TransactionForm({
   categories,
+  transaction,
+  archivedCategory,
+  busy = false,
+  footer,
   onCancel,
   onSaved,
   onDirtyChange,
@@ -130,20 +198,39 @@ export function TransactionForm({
     resolver: zodResolver(transactionSchema),
     mode: "onSubmit",
     reValidateMode: "onChange",
-    defaultValues: {
-      type: "EXPENSE",
-      amount: "",
-      categoryId: "",
-      transactionDate: today,
-      note: "",
-    },
+    defaultValues: transaction
+      ? {
+          type: transaction.type,
+          amount: String(transaction.amount),
+          categoryId: transaction.category.id,
+          transactionDate: transaction.date,
+          note: transaction.note ?? "",
+        }
+      : {
+          type: "EXPENSE",
+          amount: "",
+          categoryId: "",
+          transactionDate: today,
+          note: "",
+        },
   });
 
   const type = useWatch({ control, name: "type" });
   const note = useWatch({ control, name: "note" }) ?? "";
   const transactionDate = useWatch({ control, name: "transactionDate" });
-  const options = categories[type];
+  const categoryId = useWatch({ control, name: "categoryId" });
+  const editing = !!transaction;
+  const disabled = pending || busy;
+  const options = withCurrentCategory(categories[type], archivedCategory, {
+    type,
+    categoryId,
+  });
   const noCategories = options.length === 0;
+  const messages = {
+    systemError: editing
+      ? TRANSACTION_EDIT_MESSAGES.updateError
+      : TRANSACTION_MESSAGES.systemError,
+  };
 
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
   useEffect(() => onPendingChange(pending), [pending, onPendingChange]);
@@ -159,17 +246,20 @@ export function TransactionForm({
     setPending(true);
     setSystemError(null);
 
+    const payload = {
+      ...values,
+      amount: String(values.amount),
+      note: values.note ?? "",
+    };
     let result: Awaited<ReturnType<typeof createTransactionAction>>;
     try {
-      result = await createTransactionAction({
-        ...values,
-        amount: String(values.amount),
-        note: values.note ?? "",
-      });
+      result = transaction
+        ? await updateTransactionAction({ ...payload, id: transaction.id })
+        : await createTransactionAction(payload);
     } catch {
       // Koneksi terputus / server tidak merespons (AC 10): data form tetap.
       finish();
-      setSystemError(TRANSACTION_MESSAGES.systemError);
+      setSystemError(messages.systemError);
       return;
     }
 
@@ -193,7 +283,11 @@ export function TransactionForm({
       );
       return;
     }
-    setSystemError(error.message || TRANSACTION_MESSAGES.systemError);
+    setSystemError(
+      error.code === "INTERNAL_ERROR" || !error.message
+        ? messages.systemError
+        : error.message,
+    );
   }
 
   const setDate = (value: string) =>
@@ -207,7 +301,7 @@ export function TransactionForm({
       noValidate
       data-testid="transaction-form"
       data-type={type}
-      aria-busy={pending}
+      aria-busy={disabled}
       className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         if (submittingRef.current) {
@@ -225,7 +319,7 @@ export function TransactionForm({
             size="icon-sm"
             aria-label="Batal"
             data-testid="transaction-cancel-button"
-            disabled={pending}
+            disabled={disabled}
             onClick={onCancel}
           >
             <XIcon />
@@ -234,10 +328,12 @@ export function TransactionForm({
             data-testid="transaction-form-title"
             className="text-lg font-semibold"
           >
-            {TITLES[type]}
+            {editing ? TRANSACTION_EDIT_MESSAGES.title : TITLES[type]}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Isi nominal, kategori, tanggal, dan catatan lalu tekan Simpan.
+            {editing
+              ? "Ubah nominal, kategori, tanggal, atau catatan lalu tekan Simpan perubahan, atau hapus transaksi."
+              : "Isi nominal, kategori, tanggal, dan catatan lalu tekan Simpan."}
           </DialogDescription>
         </div>
         <Controller
@@ -246,7 +342,7 @@ export function TransactionForm({
           render={({ field }) => (
             <TransactionTypeToggle
               value={field.value}
-              disabled={pending}
+              disabled={disabled}
               onChange={(next) => {
                 if (next === field.value) return;
                 // UX-01/UX-05: kategori jenis lain dikosongkan (beserta
@@ -255,7 +351,7 @@ export function TransactionForm({
                 setValue("categoryId", "", { shouldDirty: true });
                 clearErrors("categoryId");
                 setSystemError(null);
-                amountRef.current?.focus();
+                if (!editing) amountRef.current?.focus();
               }}
             />
           )}
@@ -263,7 +359,7 @@ export function TransactionForm({
       </div>
 
       <fieldset
-        disabled={pending}
+        disabled={disabled}
         className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4"
       >
         <div className="flex flex-col gap-1.5">
@@ -426,6 +522,15 @@ export function TransactionForm({
             </span>
           </div>
         </div>
+
+        {transaction ? (
+          <p
+            data-testid="transaction-recorded-at"
+            className="text-xs text-muted-foreground"
+          >
+            {describeRecordedAt(transaction.createdAt)}
+          </p>
+        ) : null}
       </fieldset>
 
       <div className="flex flex-col gap-3 border-t px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -442,20 +547,26 @@ export function TransactionForm({
         <Button
           type="submit"
           size="lg"
-          data-testid="transaction-submit-button"
+          data-testid={
+            editing ? "transaction-update-button" : "transaction-submit-button"
+          }
           data-type={type}
           className={cn("h-11 w-full text-base", SUBMIT_TONE[type])}
-          disabled={pending || noCategories}
+          // Mode ubah: aktif hanya bila ada perubahan (AC 4).
+          disabled={disabled || noCategories || (editing && !isDirty)}
         >
           {pending ? (
             <>
               <LoaderCircleIcon className="animate-spin" aria-hidden />
               Menyimpan...
             </>
+          ) : editing ? (
+            TRANSACTION_EDIT_MESSAGES.submit
           ) : (
             "Simpan"
           )}
         </Button>
+        {footer}
       </div>
     </form>
   );
