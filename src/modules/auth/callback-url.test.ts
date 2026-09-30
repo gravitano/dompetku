@@ -36,6 +36,33 @@ describe("sanitizeCallbackUrl", () => {
     expect(sanitizeCallbackUrl(input)).toBe("/");
   });
 
+  it.each([
+    "/.//evil.com",
+    "/%2e//evil.com",
+    "/%2E//evil.com",
+    "/%2E%2E//evil.com",
+    "/%2e%2e//evil.com",
+    "/a/..//evil.com",
+    "/budgets/..//evil.com",
+    "/./\\evil.com",
+    "/\\\\evil.com",
+    "%2F%2Fevil.com",
+    "/.//evil.com/budgets?x=1",
+    "/a/b/../..//evil.com",
+  ])("dot-segment yang dinormalisasi jadi //host ditolak: %j", (input) => {
+    const result = sanitizeCallbackUrl(input);
+    expect(result).toBe("/");
+    expect(new URL(result, "https://dompetku.example").origin).toBe(
+      "https://dompetku.example",
+    );
+  });
+
+  it("hasil selalu path internal satu slash", () => {
+    for (const input of ["/./budgets", "/%2e/budgets", "/a/../budgets"]) {
+      expect(sanitizeCallbackUrl(input)).toBe("/budgets");
+    }
+  });
+
   it("path ter-encode tetap relatif ke origin sendiri", () => {
     expect(sanitizeCallbackUrl("/%2F%2Fevil.example.com")).toBe(
       "/%2F%2Fevil.example.com",

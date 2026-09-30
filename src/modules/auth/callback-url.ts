@@ -44,10 +44,7 @@ export function sanitizeCallbackUrl(value: unknown): string {
   if (!value.startsWith("/") || value.length > MAX_CALLBACK_URL_LENGTH) {
     return DEFAULT_AFTER_LOGIN_PATH;
   }
-  // Backslash & karakter kontrol bisa ditafsirkan browser sebagai `//host`.
-  if (value.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(value)) {
-    return DEFAULT_AFTER_LOGIN_PATH;
-  }
+  if (!isSafeRelativePath(value)) return DEFAULT_AFTER_LOGIN_PATH;
 
   let url: URL;
   try {
@@ -59,7 +56,28 @@ export function sanitizeCallbackUrl(value: unknown): string {
   if (isAuthPage(url.pathname) || matchesPath(url.pathname, "/api")) {
     return DEFAULT_AFTER_LOGIN_PATH;
   }
-  return `${url.pathname}${url.search}${url.hash}`;
+
+  // Validasi ulang HASIL AKHIR: normalisasi dot-segment (`/.//evil.com`,
+  // `/%2e//evil.com`, `/a/..//evil.com`) bisa menghasilkan `//evil.com`
+  // (protocol-relative) walau input mentah lolos pengecekan di atas.
+  const result = `${url.pathname}${url.search}${url.hash}`;
+  if (!isSafeRelativePath(result)) return DEFAULT_AFTER_LOGIN_PATH;
+  return result;
+}
+
+/**
+ * Path relatif yang aman: diawali tepat satu `/`, tanpa backslash / karakter
+ * kontrol (browser bisa menafsirkannya sebagai `//host`), dan tetap berada di
+ * origin sendiri saat di-resolve.
+ */
+function isSafeRelativePath(path: string): boolean {
+  if (!path.startsWith("/") || path.startsWith("//")) return false;
+  if (/[\\\u0000-\u001f\u007f]/.test(path)) return false;
+  try {
+    return new URL(path, BASE_ORIGIN).origin === BASE_ORIGIN;
+  } catch {
+    return false;
+  }
 }
 
 /**

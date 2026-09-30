@@ -273,6 +273,26 @@ test.describe("Login & logout", () => {
       await page.goto("/login?callbackUrl=%2F%2Fevil.example.com");
       await expect(page).toHaveURL(`${baseURL}/`);
     });
+
+    test("callbackUrl dot-segment yang menjadi //host diabaikan", async ({
+      page,
+      loginPage,
+      baseURL,
+    }) => {
+      // `/.//evil.example.com` dinormalisasi URL parser menjadi `//evil…`.
+      await loginPage.goto("?callbackUrl=%2F.%2F%2Fevil.example.com");
+      await loginPage.login(budi.email, budi.password);
+      await expect(page).toHaveURL(`${baseURL}/`);
+
+      // User yang sudah login membuka /login dengan payload serupa.
+      for (const payload of [
+        "%2F%252e%2F%2Fevil.example.com",
+        "%2Fa%2F..%2F%2Fevil.example.com",
+      ]) {
+        await page.goto(`/login?callbackUrl=${payload}`);
+        await expect(page).toHaveURL(`${baseURL}/`);
+      }
+    });
   });
 
   test.describe("@error-handling", () => {
