@@ -5,3 +5,41 @@
 .claude/rules/haie.md
 playwright-report/
 test-results/
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# testing
+/coverage
+/blob-report/
+/playwright/.cache/
+/test/web/.auth/
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# production
+/build
+
+# prisma generated client
+/src/generated/
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+.pnpm-debug.log*
+
+# env files
+.env
+.env*.local
+.env.*
+!.env.example
+
+# vercel
+.vercel
