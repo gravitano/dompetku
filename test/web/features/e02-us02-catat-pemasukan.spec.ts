@@ -248,6 +248,7 @@ test.describe("Catat pemasukan", () => {
         button.click();
       });
       await expect(form.submitButton).toBeDisabled();
+      await expect(form.typeExpense).toBeDisabled();
       await form.submitButton.click({ force: true }).catch(() => {});
 
       await expect(form.toast(MESSAGES.saved)).toBeVisible();

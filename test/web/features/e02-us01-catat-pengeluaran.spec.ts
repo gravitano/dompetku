@@ -399,6 +399,11 @@ test.describe("Catat pengeluaran", () => {
       await expect(form.submitButton).toBeDisabled();
       await expect(form.amountInput).toBeDisabled();
       await expect(form.cancelButton).toBeDisabled();
+      // Jenis tidak bisa diganti selama menyimpan.
+      await expect(form.typeExpense).toBeDisabled();
+      await expect(form.typeIncome).toBeDisabled();
+      await form.typeIncome.click({ force: true }).catch(() => {});
+      await expect(form.typeExpense).toHaveAttribute("aria-checked", "true");
       await expect(form.toast(MESSAGES.saved)).toBeVisible();
     });
 
