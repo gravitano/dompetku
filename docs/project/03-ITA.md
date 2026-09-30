@@ -490,13 +490,17 @@ flowchart LR
 | Constants | SCREAMING_SNAKE | `MAX_NOTE_LENGTH` |
 | Database tables | snake_case (via Prisma `@@map`) | `transactions` |
 | Routes (URL) | kebab-case | `/transactions`, `/budgets` |
+| Import alias | `~/*` → `src/*` | `import { TransactionForm } from "~/components/transactions/transaction-form"` |
+| Lokasi komponen | `~/components/<module>/**` | `~/components/budgets/budget-progress.tsx` |
 
 Struktur folder (acuan):
 ```
 src/
 ├── app/                  # Routes (App Router)
-├── modules/<domain>/     # actions.ts, queries.ts, schema.ts, components/
-├── components/ui/        # shadcn/ui
+├── components/
+│   ├── ui/               # shadcn/ui
+│   └── <module>/**       # Komponen per modul: layout, auth, transactions, categories, budgets, reports
+├── modules/<domain>/     # Logika server saja: actions.ts, queries.ts, schema.ts
 └── lib/                  # auth, prisma client, format Rupiah, util tanggal
 prisma/                   # schema.prisma, migrations, seed
 test/web/                 # Playwright (struktur HAIE)
