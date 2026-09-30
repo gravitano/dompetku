@@ -1,5 +1,5 @@
 /**
- * Schema validasi registrasi (E01-US01). Isomorfik: dipakai form client
+ * Schema validasi registrasi (E01-US01) & login (E01-US02). Isomorfik: dipakai form client
  * (`~/components/auth/register-form.tsx`) dan Server Action (`./actions.ts`).
  */
 import { z } from "zod";
@@ -90,3 +90,38 @@ export type RegisterFormValues = z.input<typeof registerSchema>;
 export type RegisterInput = z.output<typeof registerSchema>;
 
 export type RegisterField = keyof RegisterFormValues;
+
+// --- Login (E01-US02) --------------------------------------------------------
+
+export const LOGIN_MESSAGES = {
+  emailRequired: REGISTER_MESSAGES.emailRequired,
+  emailInvalid: REGISTER_MESSAGES.emailInvalid,
+  passwordRequired: REGISTER_MESSAGES.passwordRequired,
+  /** Generik: tidak membocorkan apakah email terdaftar (AC 3). */
+  invalidCredentials: "Email atau password salah",
+  /** Penguncian 5x gagal / 15 menit per email (AC 4). */
+  locked: "Terlalu banyak percobaan. Coba lagi dalam 15 menit.",
+  /** Rate limit per IP pada Server Action (production). */
+  rateLimited: "Terlalu banyak percobaan. Coba lagi dalam 1 menit.",
+  systemError: "Gagal masuk. Periksa koneksi lalu coba lagi.",
+  loggedOut: "Anda telah keluar",
+  registered: "Akun berhasil dibuat. Silakan masuk.",
+  logoutFailed: "Gagal keluar. Periksa koneksi lalu coba lagi.",
+} as const;
+
+export const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, LOGIN_MESSAGES.emailRequired)
+    .pipe(z.email(LOGIN_MESSAGES.emailInvalid))
+    .transform((email) => email.toLowerCase()),
+  // Tidak memvalidasi aturan password di login agar tidak membocorkan info.
+  password: z.string().min(1, LOGIN_MESSAGES.passwordRequired),
+});
+
+/** Nilai form login (sebelum transform). */
+export type LoginFormValues = z.input<typeof loginSchema>;
+/** Data login tervalidasi (email lowercase). */
+export type LoginInput = z.output<typeof loginSchema>;
+export type LoginField = keyof LoginFormValues;

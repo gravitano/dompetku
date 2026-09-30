@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   isPasswordValid,
+  LOGIN_MESSAGES,
+  loginSchema,
   NAME_MAX_LENGTH,
   PASSWORD_RULES,
   REGISTER_MESSAGES,
@@ -102,5 +104,40 @@ describe("PASSWORD_RULES / isPasswordValid", () => {
   it("menolak password lebih dari 128 karakter", () => {
     expect(isPasswordValid(`a1${"x".repeat(126)}`)).toBe(true);
     expect(isPasswordValid(`a1${"x".repeat(127)}`)).toBe(false);
+  });
+});
+
+describe("loginSchema", () => {
+  const errorsOfLogin = (input: Record<string, unknown>) => {
+    const result = loginSchema.safeParse(input);
+    if (result.success) return {};
+    return Object.fromEntries(
+      result.error.issues.map((issue) => [issue.path.join("."), issue.message]),
+    );
+  };
+
+  it("menerima data valid & lowercase email", () => {
+    expect(
+      loginSchema.parse({ email: " Budi@Example.COM ", password: "x" }),
+    ).toEqual({ email: "budi@example.com", password: "x" });
+  });
+
+  it("field wajib diisi", () => {
+    expect(errorsOfLogin({ email: "", password: "" })).toEqual({
+      email: LOGIN_MESSAGES.emailRequired,
+      password: LOGIN_MESSAGES.passwordRequired,
+    });
+  });
+
+  it("format email tidak valid", () => {
+    expect(errorsOfLogin({ email: "budi@example", password: "x" })).toEqual({
+      email: LOGIN_MESSAGES.emailInvalid,
+    });
+  });
+
+  it("tidak memvalidasi aturan password saat login", () => {
+    expect(
+      loginSchema.safeParse({ email: "a@b.co", password: "1" }).success,
+    ).toBe(true);
   });
 });

@@ -30,6 +30,7 @@ updated: 2026-09-30
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-09-30 | Warsono | Versi awal |
+| 1.1 | 2026-09-30 | Warsono | E01-US02: kode error `RATE_LIMITED`, penguncian login per email, `callbackUrl` di proxy |
 
 ---
 
@@ -343,7 +344,7 @@ Semua Server Action mengembalikan result object yang konsisten:
 }
 ```
 
-Kode error standar: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`. Pesan error untuk pengguna ditulis dalam Bahasa Indonesia.
+Kode error standar: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `INTERNAL_ERROR`. Pesan error untuk pengguna ditulis dalam Bahasa Indonesia.
 
 ---
 
@@ -356,9 +357,9 @@ Kode error standar: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`,
 | Auth Method | better-auth, email + password, database session |
 | Session TTL | 7 hari, diperpanjang otomatis saat aktif; dicabut saat logout |
 | Password Hashing | Algoritma bawaan better-auth (scrypt); minimal 8 karakter |
-| Rate limiting | Rate limiter bawaan better-auth untuk endpoint login/registrasi |
+| Rate limiting | Rate limiter bawaan better-auth (per IP) untuk endpoint HTTP auth; limiter per IP di Server Action login/registrasi (production); penguncian login per email 5x gagal / 15 menit (hook sign-in better-auth) |
 | Authorization | Owner-based: setiap record punya `user_id`, dan semua query difilter berdasarkan `userId` dari session |
-| Route protection | Middleware Next.js mengarahkan user tanpa session ke `/login`; pengecekan session tetap diulang di setiap action/query (defense in depth) |
+| Route protection | Proxy Next.js (`src/proxy.ts`) mengarahkan user tanpa session ke `/login?callbackUrl=<path internal>`; pengecekan session tetap diulang di setiap layout/action/query (defense in depth) |
 
 ### 6.2 Security Measures
 

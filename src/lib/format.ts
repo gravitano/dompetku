@@ -9,3 +9,17 @@ export function formatRupiah(value: bigint | number): string {
   const digits = abs.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `${negative ? "-" : ""}Rp ${digits}`;
 }
+
+/**
+ * Inisial nama untuk avatar (maks. 2 huruf): "Budi Santoso" → "BS",
+ * "budi" → "B", kosong → "?".
+ */
+export function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  const letters =
+    words.length === 1
+      ? [words[0].charAt(0)]
+      : [words[0].charAt(0), words[words.length - 1].charAt(0)];
+  return letters.join("").toUpperCase();
+}

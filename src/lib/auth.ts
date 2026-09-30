@@ -1,18 +1,31 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 
 import { prisma } from "~/lib/prisma";
+import {
+  LOGIN_LOCKED_ERROR_CODE,
+  loginLockout,
+  readSignInEmail,
+} from "~/modules/auth/login-lockout";
+import { LOGIN_MESSAGES } from "~/modules/auth/schema";
 
-const SEVEN_DAYS_IN_SECONDS = 60 * 60 * 24 * 7;
-const ONE_DAY_IN_SECONDS = 60 * 60 * 24;
+/** Sesi berlaku 7 hari sejak aktivitas terakhir (E01-US02 AC 7). */
+export const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
+/** Masa berlaku sesi diperpanjang paling sering 1x per hari saat aktif. */
+export const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;
+
+const SIGN_IN_EMAIL_PATH = "/sign-in/email";
 
 /**
  * Konfigurasi better-auth (ITA §6.1).
  * - Email + password, hash scrypt bawaan, minimal 8 karakter.
  * - Database session 7 hari, diperpanjang otomatis (sliding) tiap 1 hari aktif.
- * - Rate limit aktif untuk semua environment; aturan ketat di endpoint auth.
- *   Penguncian per-email (5x gagal / 15 menit) milik story E01-US02.
+ * - Rate limit per IP aktif untuk semua environment (hanya request HTTP
+ *   `/api/auth/*`); aturan ketat di endpoint sign-in.
+ * - Penguncian per email 5x gagal / 15 menit (E01-US02) lewat hook sign-in,
+ *   berlaku untuk HTTP maupun `auth.api.signInEmail` (Server Action login).
  * - Registrasi hanya lewat Server Action `registerAction` (E01-US01) yang membuat
  *   user + kategori bawaan dalam satu transaksi, sehingga endpoint HTTP
  *   `/sign-up/email` dinonaktifkan (`auth.api.*` di server tidak terpengaruh).
@@ -30,8 +43,35 @@ export const auth = betterAuth({
     autoSignIn: true,
   },
   session: {
-    expiresIn: SEVEN_DAYS_IN_SECONDS,
-    updateAge: ONE_DAY_IN_SECONDS,
+    expiresIn: SESSION_EXPIRES_IN_SECONDS,
+    updateAge: SESSION_UPDATE_AGE_SECONDS,
+  },
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== SIGN_IN_EMAIL_PATH) return;
+      const email = readSignInEmail(ctx.body);
+      // Reservasi dulu (increment sebelum verifikasi) agar burst paralel
+      // tidak bisa mencoba lebih dari 5 password.
+      if (email && loginLockout.reserveAttempt(email).locked) {
+        throw new APIError("TOO_MANY_REQUESTS", {
+          code: LOGIN_LOCKED_ERROR_CODE,
+          message: LOGIN_MESSAGES.locked,
+        });
+      }
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== SIGN_IN_EMAIL_PATH) return;
+      const email = readSignInEmail(ctx.body);
+      if (!email) return;
+      const returned = ctx.context.returned;
+      if (isAPIError(returned)) {
+        // 401 = email/password salah → reservasi tetap terhitung sebagai gagal.
+        // Error lain (validasi, sistem) tidak dihitung.
+        if (returned.statusCode !== 401) loginLockout.release(email);
+        return;
+      }
+      loginLockout.reset(email);
+    }),
   },
   rateLimit: {
     enabled: true,

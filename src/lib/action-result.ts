@@ -18,6 +18,7 @@ export const ERROR_CODES = [
   "UNAUTHORIZED",
   "NOT_FOUND",
   "CONFLICT",
+  "RATE_LIMITED",
   "INTERNAL_ERROR",
 ] as const;
 
@@ -69,5 +70,6 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   UNAUTHORIZED: "Sesi berakhir. Silakan masuk kembali.",
   NOT_FOUND: "Data tidak ditemukan",
   CONFLICT: "Data sudah ada",
+  RATE_LIMITED: "Terlalu banyak percobaan. Coba lagi nanti.",
   INTERNAL_ERROR: "Terjadi kesalahan. Coba lagi nanti.",
 };

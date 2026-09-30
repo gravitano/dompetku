@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatRupiah } from "./format";
+import { formatRupiah, getInitials } from "./format";
 
 describe("formatRupiah", () => {
   it.each([
@@ -26,5 +26,17 @@ describe("formatRupiah", () => {
 
   it("number desimal dibulatkan ke bawah (Rupiah penuh)", () => {
     expect(formatRupiah(25_000.9)).toBe("Rp 25.000");
+  });
+});
+
+describe("getInitials", () => {
+  it.each([
+    ["Budi Santoso", "BS"],
+    ["budi", "B"],
+    ["  Ani  Wijaya  Putri ", "AP"],
+    ["", "?"],
+    ["   ", "?"],
+  ])("%j → %s", (name, expected) => {
+    expect(getInitials(name)).toBe(expected);
   });
 });

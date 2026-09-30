@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 type AppHeaderProps = {
-  /** Slot kanan atas — menu akun (diisi story E01-US02: logout, kategori, dll). */
+  /** Slot kanan atas — menu akun (`~/components/layout/account-menu`). */
   accountMenu?: ReactNode;
 };
 
