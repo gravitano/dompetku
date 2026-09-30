@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-01---akun-keamanan/e01-us02--login-logout---story.md
-status: proposed
+status: implemented
 branch: dev/e01-us02--login-logout
 ---
 
@@ -70,3 +70,8 @@ bisa diakses olehnya (BRD FEAT-002, §6). Acceptance criteria (story §3):
 Skenario `e01-us02--login-logout---testing.md` → `test/web/features/e01-us02-login-logout.spec.ts` + `test/web/smoke/login.spec.ts`
 (mobile 390×844 & desktop 1280×800). Unit test (Vitest): `loginSchema`, `sanitizeCallbackUrl`, lockout, `loginAction`/`logoutAction`,
 konfigurasi sesi.
+
+Catatan E2E: skenario email tidak terdaftar memakai email unik per run (`tidakada+…@example.com`) karena
+penghitung lockout per email tidak pernah di-reset untuk email yang tidak bisa login; skenario lockout memakai
+`lock@example.com` dan toleran bila akun sudah terkunci dari run sebelumnya (< 15 menit). Fixture `loginAs`
+memakai `X-Forwarded-For` acak agar rate limiter per IP bawaan better-auth tidak terpicu test paralel.
