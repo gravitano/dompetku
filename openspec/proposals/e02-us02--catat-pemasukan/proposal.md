@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-02---pencatatan-transaksi/e02-us02--catat-pemasukan---story.md
-status: in-progress
+status: implemented
 branch: dev/e02-us02--catat-pemasukan
 ---
 
