@@ -124,6 +124,11 @@ function describeDate(value: string, today: string): string {
   return label;
 }
 
+/** "0025000" → "25000" (nominal berupa string digit dari `AmountInput`). */
+function normalizeAmount(value: string): string {
+  return value.replace(/^0+(?=\d)/, "");
+}
+
 function describedBy(...ids: Array<string | false | undefined>) {
   return ids.filter(Boolean).join(" ") || undefined;
 }
@@ -220,7 +225,18 @@ export function TransactionForm({
   const note = useWatch({ control, name: "note" }) ?? "";
   const transactionDate = useWatch({ control, name: "transactionDate" });
   const categoryId = useWatch({ control, name: "categoryId" });
+  const amount = useWatch({ control, name: "amount" }) ?? "";
   const editing = !!transaction;
+  // Mode ubah: bandingkan nilai ternormalisasi (catatan di-trim, nominal tanpa
+  // nol di depan) dengan data awal — spasi di belakang catatan saja bukan
+  // perubahan (AC 4).
+  const changed = transaction
+    ? type !== transaction.type ||
+      normalizeAmount(amount) !== normalizeAmount(String(transaction.amount)) ||
+      categoryId !== transaction.category.id ||
+      transactionDate !== transaction.date ||
+      note.trim() !== (transaction.note ?? "").trim()
+    : isDirty;
   const disabled = pending || busy;
   const options = withCurrentCategory(categories[type], archivedCategory, {
     type,
@@ -233,7 +249,7 @@ export function TransactionForm({
       : TRANSACTION_MESSAGES.systemError,
   };
 
-  useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
+  useEffect(() => onDirtyChange(changed), [changed, onDirtyChange]);
   useEffect(() => onPendingChange(pending), [pending, onPendingChange]);
 
   function finish() {
@@ -556,7 +572,7 @@ export function TransactionForm({
           data-type={type}
           className={cn("h-11 w-full text-base", SUBMIT_TONE[type])}
           // Mode ubah: aktif hanya bila ada perubahan (AC 4).
-          disabled={disabled || noCategories || (editing && !isDirty)}
+          disabled={disabled || noCategories || (editing && !changed)}
         >
           {pending ? (
             <>

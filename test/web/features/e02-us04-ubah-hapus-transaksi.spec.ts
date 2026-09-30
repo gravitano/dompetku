@@ -195,6 +195,10 @@ test.describe("Ubah dan hapus transaksi", () => {
     await expect(detail.updateButton).toBeEnabled();
     await detail.form.noteInput.fill("Makan siang");
     await expect(detail.updateButton).toBeDisabled();
+
+    // Spasi di awal/akhir catatan saja bukan perubahan (disimpan ter-trim).
+    await detail.form.noteInput.fill("  Makan siang   ");
+    await expect(detail.updateButton).toBeDisabled();
   });
 
   test("nominal tidak valid saat mengubah", async ({ page, db }) => {
