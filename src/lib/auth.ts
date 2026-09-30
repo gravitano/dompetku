@@ -13,12 +13,16 @@ const ONE_DAY_IN_SECONDS = 60 * 60 * 24;
  * - Database session 7 hari, diperpanjang otomatis (sliding) tiap 1 hari aktif.
  * - Rate limit aktif untuk semua environment; aturan ketat di endpoint auth.
  *   Penguncian per-email (5x gagal / 15 menit) milik story E01-US02.
+ * - Registrasi hanya lewat Server Action `registerAction` (E01-US01) yang membuat
+ *   user + kategori bawaan dalam satu transaksi, sehingga endpoint HTTP
+ *   `/sign-up/email` dinonaktifkan (`auth.api.*` di server tidak terpengaruh).
  */
 export const auth = betterAuth({
   appName: "DompetKu",
   baseURL: process.env.BETTER_AUTH_URL,
   secret: process.env.BETTER_AUTH_SECRET,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
+  disabledPaths: ["/sign-up/email"],
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
@@ -35,7 +39,6 @@ export const auth = betterAuth({
     max: 100,
     customRules: {
       "/sign-in/email": { window: 60, max: 10 },
-      "/sign-up/email": { window: 60, max: 5 },
     },
   },
   advanced: {
