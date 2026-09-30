@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+
+import { WelcomeToast } from "~/components/auth/welcome-toast";
 import { AccountMenuPlaceholder } from "~/components/layout/account-menu-placeholder";
 import { AppShell } from "~/components/layout/app-shell";
 import { requireUserOrRedirect } from "~/lib/session";
@@ -11,6 +14,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <AppShell accountMenu={<AccountMenuPlaceholder name={user.name} />}>
       {children}
+      <Suspense fallback={null}>
+        <WelcomeToast name={user.name} />
+      </Suspense>
     </AppShell>
   );
 }
