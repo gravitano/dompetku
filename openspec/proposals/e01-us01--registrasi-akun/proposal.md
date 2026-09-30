@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-01---akun-keamanan/e01-us01--registrasi-akun---story.md
-status: in-progress
+status: implemented
 branch: dev/e01-us01--registrasi-akun
 ---
 
