@@ -5,8 +5,10 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { auth, type SessionUser } from "~/lib/auth";
-
-export const LOGIN_PATH = "/login";
+import {
+  buildLoginUrl,
+  REQUEST_PATH_HEADER,
+} from "~/modules/auth/callback-url";
 
 /**
  * Ambil user dari session aktif (atau null). Di-cache per request.
@@ -38,10 +40,14 @@ export async function requireUser(): Promise<SessionUser> {
 
 /**
  * Wajib login — untuk page/layout (Server Component). Redirect ke /login
- * bila belum login.
+ * (dengan `callbackUrl` path asli dari proxy) bila belum login / session
+ * sudah tidak berlaku.
  */
 export async function requireUserOrRedirect(): Promise<SessionUser> {
   const user = await getSessionUser();
-  if (!user) redirect(LOGIN_PATH);
+  if (!user) {
+    const requestHeaders = await headers();
+    redirect(buildLoginUrl(requestHeaders.get(REQUEST_PATH_HEADER)));
+  }
   return user;
 }
