@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, development, develop]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, unit test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      # Nilai dummy: build tidak membutuhkan koneksi DB.
+      DATABASE_URL: postgresql://dompetku:dompetku@localhost:5432/dompetku?schema=public
+      BETTER_AUTH_SECRET: ci-dummy-secret-not-used-in-production-000000
+      BETTER_AUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm db:generate
+
+      - name: Lint
+        run: pnpm exec eslint .
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Unit test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
