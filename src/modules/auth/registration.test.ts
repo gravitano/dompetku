@@ -36,7 +36,7 @@ function createFakeDb({ existing = false } = {}) {
       })),
     },
     category: {
-      findMany: vi.fn(async () => []),
+      count: vi.fn(async () => 0),
       createMany: vi.fn(async ({ data }: { data: unknown[] }) => ({
         count: data.length,
       })),

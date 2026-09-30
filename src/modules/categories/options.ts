@@ -128,3 +128,46 @@ export function buildFilterCategories(
     };
   });
 }
+
+/** Kategori di halaman Kelola Kategori (E02-US05). */
+export type ManagedCategory = {
+  id: string;
+  name: string;
+  type: CategoryType;
+  icon: string | null;
+  isDefault: boolean;
+  archived: boolean;
+  /** Jumlah transaksi yang memakai kategori ini (semua waktu). */
+  transactionCount: number;
+  /**
+   * Kunci unik per jenis untuk `data-testid="category-row-<slug>"` /
+   * `category-restore-button-<slug>`: slug nama, ditambah nomor urut bila
+   * dua nama berbeda menghasilkan slug yang sama.
+   */
+  slug: string;
+};
+
+/**
+ * Urutkan kategori halaman Kategori: aktif lalu terarsip, masing-masing urut
+ * abjad (design "Default"), dengan slug unik per jenis.
+ */
+export function buildManagedCategories(
+  categories: ReadonlyArray<
+    Omit<ManagedCategory, "slug" | "archived"> & { archivedAt: Date | null }
+  >,
+): ManagedCategory[] {
+  const sorted = [...categories].sort(
+    (a, b) =>
+      Number(!!a.archivedAt) - Number(!!b.archivedAt) ||
+      a.name.localeCompare(b.name, "id", { sensitivity: "base" }) ||
+      a.id.localeCompare(b.id),
+  );
+  const used = new Set<string>();
+  return sorted.map(({ archivedAt, ...c }) => {
+    const stem = categorySlug(c.name) || "kategori";
+    let slug = stem;
+    for (let n = 2; used.has(`${c.type}:${slug}`); n++) slug = `${stem}-${n}`;
+    used.add(`${c.type}:${slug}`);
+    return { ...c, archived: !!archivedAt, slug };
+  });
+}

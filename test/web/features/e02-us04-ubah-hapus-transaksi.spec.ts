@@ -195,7 +195,46 @@ test.describe("Ubah dan hapus transaksi", () => {
     await expect(detail.updateButton).toBeEnabled();
     await detail.form.noteInput.fill("Makan siang");
     await expect(detail.updateButton).toBeDisabled();
+
+    // Spasi di awal/akhir catatan saja bukan perubahan (disimpan ter-trim).
+    await detail.form.noteInput.fill("  Makan siang   ");
+    await expect(detail.updateButton).toBeDisabled();
   });
+
+  for (const action of ["simpan", "hapus"] as const) {
+    test(`setelah ${action} dari daftar, Back pertama kembali ke halaman sebelum daftar`, async ({
+      page,
+      db,
+    }) => {
+      await page.goto("/");
+      await openMakanSiang(page);
+      if (action === "simpan") {
+        await detail.form.noteInput.fill("Makan malam");
+        await detail.save();
+      } else {
+        await detail.deleteAndConfirm();
+      }
+      await expect(detail.sheet).toBeHidden();
+      await expect(page).toHaveURL(
+        (url) =>
+          url.pathname === "/transactions" &&
+          url.searchParams.get("month") === BASE,
+      );
+      // Data daftar dimuat ulang setelah kembali.
+      if (action === "simpan") {
+        await expect(list.row("Makan malam")).toBeVisible();
+      } else {
+        await expect(list.row("Makan siang")).toHaveCount(0);
+        await expect(list.row("Ojek")).toBeVisible();
+      }
+      expect((await db.getTransactions(user.id)).length).toBe(
+        action === "simpan" ? 2 : 1,
+      );
+
+      await page.goBack();
+      await expect(page).toHaveURL((url) => url.pathname === "/");
+    });
+  }
 
   test("nominal tidak valid saat mengubah", async ({ page, db }) => {
     await openMakanSiang(page);

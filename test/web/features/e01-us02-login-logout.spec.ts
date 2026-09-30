@@ -128,9 +128,10 @@ test.describe("Login & logout", () => {
       await shell.openAccountMenu();
       await expect(shell.accountMenuUserName).toHaveText(budi.name);
       await expect(shell.accountMenuEmail).toHaveText(budi.email);
+      await expect(shell.accountMenuCategories).toHaveText("Kategori");
       await expect(shell.accountMenuCategories).toHaveAttribute(
-        "data-disabled",
-        "",
+        "href",
+        "/categories",
       );
       await expect(shell.logoutItem).toHaveText("Keluar");
 

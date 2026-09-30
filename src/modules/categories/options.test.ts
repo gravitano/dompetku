@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_EXPENSE_CATEGORIES } from "./defaults";
 import {
   buildFilterCategories,
+  buildManagedCategories,
   categorySlug,
   groupCategoryOptions,
 } from "./options";
@@ -99,6 +100,55 @@ describe("buildFilterCategories (E02-US03 panel filter)", () => {
       li: "lainnya-income",
       la: "lainnya-expense-archived",
       m: "makan-minum",
+    });
+  });
+});
+
+describe("buildManagedCategories (E02-US05 halaman Kategori)", () => {
+  const archivedAt = new Date("2026-09-01T00:00:00Z");
+  const category = (
+    id: string,
+    name: string,
+    type: "EXPENSE" | "INCOME" = "EXPENSE",
+    extra: { archivedAt?: Date | null; transactionCount?: number } = {},
+  ) => ({
+    id,
+    name,
+    type,
+    icon: null,
+    isDefault: false,
+    archivedAt: extra.archivedAt ?? null,
+    transactionCount: extra.transactionCount ?? 0,
+  });
+
+  it("aktif lalu terarsip, masing-masing abjad; flag archived", () => {
+    const result = buildManagedCategories([
+      category("t", "Transportasi"),
+      category("g", "Game", "EXPENSE", { archivedAt }),
+      category("b", "belanja"),
+      category("a", "Arisan", "EXPENSE", { archivedAt }),
+      category("k", "Kopi", "EXPENSE", { transactionCount: 3 }),
+    ]);
+    expect(result.map((c) => [c.name, c.archived])).toEqual([
+      ["belanja", false],
+      ["Kopi", false],
+      ["Transportasi", false],
+      ["Arisan", true],
+      ["Game", true],
+    ]);
+    expect(result[1]).toMatchObject({ slug: "kopi", transactionCount: 3 });
+  });
+
+  it("slug unik per jenis bila nama berbeda menghasilkan slug sama", () => {
+    const result = buildManagedCategories([
+      category("1", "Kopi!"),
+      category("2", "Kopi"),
+      category("3", "Kopi", "INCOME"),
+    ]);
+    expect(Object.fromEntries(result.map((c) => [c.id, c.slug]))).toEqual({
+      "2": "kopi",
+      "1": "kopi-2",
+      "3": "kopi",
     });
   });
 });

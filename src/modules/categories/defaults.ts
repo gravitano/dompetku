@@ -40,8 +40,10 @@ export const DEFAULT_CATEGORIES: readonly DefaultCategory[] = [
 export type CategoryDb = { category: Prisma.TransactionClient["category"] };
 
 /**
- * Buat kategori bawaan untuk `userId`. Idempotent: kategori bawaan yang sudah
- * ada (nama + tipe sama) tidak dibuat ulang.
+ * Buat kategori bawaan untuk `userId` — hanya bila user belum punya kategori
+ * sama sekali (user baru). Idempotent: menjalankan ulang seed tidak
+ * menghidupkan lagi kategori bawaan yang sudah diubah namanya / dihapus user
+ * (E02-US05) dan tidak menabrak aturan nama unik per jenis.
  *
  * @param db opsional — isi dengan transaction client (`tx`) bila dipanggil di
  *           dalam `prisma.$transaction`, atau client lain (seed). Default: `prisma`.
@@ -53,17 +55,11 @@ export async function seedDefaultCategories(
 ): Promise<number> {
   const client = db ?? (await import("~/lib/prisma")).prisma;
 
-  const existing = await client.category.findMany({
-    where: { userId, isDefault: true },
-    select: { name: true, type: true },
+  const existing = await client.category.count({ where: { userId } });
+  if (existing > 0) return 0;
+
+  const result = await client.category.createMany({
+    data: DEFAULT_CATEGORIES.map((c) => ({ ...c, userId, isDefault: true })),
   });
-  const existingKeys = new Set(existing.map((c) => `${c.type}:${c.name}`));
-
-  const toCreate = DEFAULT_CATEGORIES.filter(
-    (c) => !existingKeys.has(`${c.type}:${c.name}`),
-  ).map((c) => ({ ...c, userId, isDefault: true }));
-
-  if (toCreate.length === 0) return 0;
-  const result = await client.category.createMany({ data: toCreate });
   return result.count;
 }
