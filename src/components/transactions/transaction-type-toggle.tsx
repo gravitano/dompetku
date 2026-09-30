@@ -6,8 +6,6 @@ import type { TransactionType } from "~/modules/transactions/schema";
 type TransactionTypeToggleProps = {
   value: TransactionType;
   onChange: (type: TransactionType) => void;
-  /** Jenis yang belum bisa dipilih (mis. Pemasukan sebelum E02-US02). */
-  disabledTypes?: readonly TransactionType[];
 };
 
 const OPTIONS: ReadonlyArray<{
@@ -30,11 +28,16 @@ const OPTIONS: ReadonlyArray<{
   },
 ];
 
-/** Segmented control **Pengeluaran | Pemasukan** di atas form transaksi. */
+const ARROW_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+
+/**
+ * Segmented control **Pengeluaran | Pemasukan** di atas form transaksi
+ * (E02-US02 UX-01/UX-05): jenis aktif berwarna merah / hijau. Panah
+ * kiri/kanan berpindah jenis (pola radiogroup).
+ */
 export function TransactionTypeToggle({
   value,
   onChange,
-  disabledTypes = [],
 }: TransactionTypeToggleProps) {
   return (
     <div
@@ -45,7 +48,6 @@ export function TransactionTypeToggle({
     >
       {OPTIONS.map((option) => {
         const checked = option.type === value;
-        const disabled = disabledTypes.includes(option.type);
         return (
           <button
             key={option.type}
@@ -54,12 +56,22 @@ export function TransactionTypeToggle({
             aria-checked={checked}
             data-state={checked ? "checked" : "unchecked"}
             data-testid={option.testId}
-            disabled={disabled}
-            title={disabled ? "Segera hadir" : undefined}
+            tabIndex={checked ? 0 : -1}
             onClick={() => onChange(option.type)}
+            onKeyDown={(event) => {
+              if (!ARROW_KEYS.includes(event.key)) return;
+              event.preventDefault();
+              const other = OPTIONS.find((o) => o.type !== value)!;
+              onChange(other.type);
+              event.currentTarget.parentElement
+                ?.querySelector<HTMLButtonElement>(
+                  `[data-testid="${other.testId}"]`,
+                )
+                ?.focus();
+            }}
             className={cn(
-              "h-8 rounded-md text-sm font-medium text-muted-foreground transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-              checked && option.activeClass,
+              "h-8 rounded-md text-sm font-medium text-muted-foreground transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              checked ? option.activeClass : "hover:text-foreground",
             )}
           >
             {option.label}

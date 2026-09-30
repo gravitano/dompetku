@@ -11,6 +11,7 @@ import {
 } from "react-hook-form";
 
 import { CategoryGrid } from "~/components/categories/category-grid";
+import { ManageCategoriesLink } from "~/components/categories/manage-categories-link";
 import { Button } from "~/components/ui/button";
 import { DialogDescription, DialogTitle } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
@@ -43,11 +44,12 @@ const TITLES: Record<TransactionType, string> = {
   INCOME: "Catat Pemasukan",
 };
 
-/**
- * Jenis yang belum bisa dipilih: logika & AC pemasukan milik E02-US02. Untuk
- * mengaktifkan, kosongkan daftar ini (form, schema & action sudah generik).
- */
-const DISABLED_TYPES: readonly TransactionType[] = ["INCOME"];
+/** Tombol Simpan: warna utama untuk pengeluaran, hijau untuk pemasukan. */
+const SUBMIT_TONE: Record<TransactionType, string> = {
+  EXPENSE: "",
+  INCOME:
+    "bg-income-action text-income-action-foreground hover:bg-income-action/90",
+};
 
 type TransactionFormProps = {
   categories: CategoryOptionsByType;
@@ -97,7 +99,8 @@ function FieldMessage({ id, error }: { id: string; error?: FieldError }) {
 }
 
 /**
- * Form catat transaksi (E02-US01; mode pemasukan E02-US02). Validasi dijalankan
+ * Form catat transaksi (E02-US01; mode pemasukan E02-US02 lewat toggle jenis,
+ * default Pengeluaran). Validasi dijalankan
  * saat Simpan lalu ulang per field saat diubah; data yang sudah diisi tidak
  * pernah dikosongkan saat ada error (AC 7, AC 10).
  */
@@ -121,6 +124,7 @@ export function TransactionForm({
     handleSubmit,
     setError,
     setValue,
+    clearErrors,
     formState: { errors, isDirty },
   } = useForm<TransactionFormValues, unknown, TransactionInput>({
     resolver: zodResolver(transactionSchema),
@@ -242,11 +246,15 @@ export function TransactionForm({
           render={({ field }) => (
             <TransactionTypeToggle
               value={field.value}
-              disabledTypes={DISABLED_TYPES}
               onChange={(next) => {
                 if (next === field.value) return;
+                // UX-01/UX-05: kategori jenis lain dikosongkan (beserta
+                // pesannya); nominal, tanggal & catatan tetap.
                 field.onChange(next);
                 setValue("categoryId", "", { shouldDirty: true });
+                clearErrors("categoryId");
+                setSystemError(null);
+                amountRef.current?.focus();
               }}
             />
           )}
@@ -307,7 +315,9 @@ export function TransactionForm({
                 describedBy={
                   errors.categoryId ? "transaction-category-error" : undefined
                 }
-                emptyMessage={TRANSACTION_MESSAGES.noCategories}
+                tone={type === "INCOME" ? "income" : "expense"}
+                emptyMessage={TRANSACTION_MESSAGES.noCategories[type]}
+                emptyAction={<ManageCategoriesLink />}
               />
             )}
           />
@@ -432,7 +442,8 @@ export function TransactionForm({
           type="submit"
           size="lg"
           data-testid="transaction-submit-button"
-          className="h-11 w-full text-base"
+          data-type={type}
+          className={cn("h-11 w-full text-base", SUBMIT_TONE[type])}
           disabled={pending || noCategories}
         >
           {pending ? (

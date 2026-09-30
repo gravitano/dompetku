@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-export type ExpenseData = {
+export type TransactionData = {
   amount?: string;
   /** Slug kategori, mis. "makan-minum" (`category-option-<slug>`). */
   category?: string;
@@ -22,6 +22,8 @@ export class TransactionFormPage {
   readonly categoryGrid: Locator;
   readonly categoryOptions: Locator;
   readonly categoryError: Locator;
+  readonly categoryEmpty: Locator;
+  readonly categoryManageLink: Locator;
   readonly datePicker: Locator;
   readonly dateLabel: Locator;
   readonly dateToday: Locator;
@@ -48,6 +50,8 @@ export class TransactionFormPage {
     this.categoryGrid = page.getByTestId("category-grid");
     this.categoryOptions = this.categoryGrid.getByRole("radio");
     this.categoryError = page.getByTestId("transaction-category-error");
+    this.categoryEmpty = page.getByTestId("category-empty");
+    this.categoryManageLink = page.getByTestId("category-manage-link");
     this.datePicker = page.getByTestId("transaction-date-picker");
     this.dateLabel = page.getByTestId("transaction-date-label");
     this.dateToday = page.getByTestId("transaction-date-today");
@@ -77,7 +81,7 @@ export class TransactionFormPage {
     await this.dialog.waitFor({ state: "visible" });
   }
 
-  async fill({ amount, category, date, note }: ExpenseData) {
+  async fill({ amount, category, date, note }: TransactionData) {
     if (amount !== undefined) await this.amountInput.fill(amount);
     if (category) await this.category(category).click();
     if (date) await this.datePicker.fill(date);
@@ -88,9 +92,22 @@ export class TransactionFormPage {
     await this.submitButton.click();
   }
 
+  /** Pilih jenis transaksi lewat toggle (UX-01 / UX-05 E02-US02). */
+  async selectType(type: "expense" | "income") {
+    await (type === "income" ? this.typeIncome : this.typeExpense).click();
+  }
+
   /** Buka form, isi, lalu Simpan. */
-  async addExpense(data: ExpenseData) {
+  async addExpense(data: TransactionData) {
     await this.open();
+    await this.fill(data);
+    await this.submit();
+  }
+
+  /** Buka form, pilih Pemasukan, isi, lalu Simpan. */
+  async addIncome(data: TransactionData) {
+    await this.open();
+    await this.selectType("income");
     await this.fill(data);
     await this.submit();
   }

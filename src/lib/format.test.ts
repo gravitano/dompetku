@@ -59,9 +59,32 @@ describe("parseAmountInput", () => {
     ["007", "7"],
     ["abc", ""],
     ["-5", "5"],
-    ["1,5", "15"],
+    ["1,5", "1"],
   ])("%j → %j", (input, expected) => {
     expect(parseAmountInput(input)).toBe(expected);
+  });
+
+  describe("paste nominal (bagian desimal di akhir diabaikan)", () => {
+    it.each([
+      ["Rp 25.000,00", "25000"],
+      ["Rp25.000,00", "25000"],
+      ["1.500.000,50", "1500000"],
+      ["Rp 1.500.000,5", "1500000"],
+      ["  Rp 8.000.000,00  ", "8000000"],
+      ["Rp 25.000,-", "25000"],
+      ["Rp 25.000", "25000"],
+      ["25.000", "25000"],
+      ["25000", "25000"],
+      ["Rp 1 500 000", "1500000"],
+      ["IDR 1.000.000", "1000000"],
+      ["25,000", "25000"],
+      ["1,000,000", "1000000"],
+      ["0,50", "0"],
+      [",50", ""],
+      ["Rp 25.000,", "25000"],
+    ])("%j → %j", (input, expected) => {
+      expect(parseAmountInput(input)).toBe(expected);
+    });
   });
 
   it(`maksimal ${AMOUNT_INPUT_MAX_DIGITS} digit`, () => {

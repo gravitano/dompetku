@@ -9,9 +9,11 @@
  * tanpa transaksi) lewat fixture `createUser` — setara "budi tanpa transaksi
  * (reset via seed)" tetapi aman untuk test paralel di 2 viewport.
  */
-import type { Page } from "@playwright/test";
-
 import { expect, test, type CreatedUser } from "../fixtures";
+import {
+  abortServerActions,
+  delayServerActions,
+} from "../fixtures/server-actions";
 import { AppShell } from "../pages/app-shell";
 import { HomePage, jakartaDate } from "../pages/home-page";
 import { TransactionFormPage } from "../pages/transaction-form";
@@ -33,29 +35,6 @@ const EXPENSE_SLUGS = [
   "kesehatan",
   "lainnya",
 ];
-
-/** Tahan request Server Action (POST + header `Next-Action`). */
-async function delayServerActions(page: Page, ms: number) {
-  await page.route("**/*", async (route) => {
-    const request = route.request();
-    if (request.method() === "POST" && request.headers()["next-action"]) {
-      await new Promise((resolve) => setTimeout(resolve, ms));
-    }
-    await route.fallback();
-  });
-}
-
-/** Putuskan request Server Action (simulasi koneksi terputus). */
-async function abortServerActions(page: Page) {
-  await page.route("**/*", async (route) => {
-    const request = route.request();
-    if (request.method() === "POST" && request.headers()["next-action"]) {
-      await route.abort("internetdisconnected");
-      return;
-    }
-    await route.fallback();
-  });
-}
 
 test.describe("Catat pengeluaran", () => {
   let user: CreatedUser;
@@ -379,7 +358,7 @@ test.describe("Catat pengeluaran", () => {
       await expect(form.amountInput).toBeFocused();
       await expect(form.amountInput).toHaveAttribute("inputmode", "numeric");
       await expect(form.typeExpense).toHaveAttribute("aria-checked", "true");
-      await expect(form.typeIncome).toBeDisabled(); // E02-US02
+      await expect(form.typeIncome).toHaveAttribute("aria-checked", "false");
       await expect(form.categoryOptions).toHaveCount(EXPENSE_SLUGS.length);
       for (const slug of EXPENSE_SLUGS) {
         await expect(form.category(slug)).toHaveAttribute(
