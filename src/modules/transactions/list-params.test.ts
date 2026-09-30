@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   countActiveFilters,
+  detailBackHref,
   normalizeTransactionListFilter,
   parseTransactionListParams,
   TRANSACTION_FILTER_MAX_CATEGORIES,
   transactionListHref,
+  transactionDetailHref,
   transactionListSearch,
   transactionPageRequestSchema,
 } from "./schema";
@@ -215,5 +217,57 @@ describe("transactionPageRequestSchema", () => {
     ["tanpa cursor", { filter: valid.filter }],
   ])("menolak %s", (_, input) => {
     expect(transactionPageRequestSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe("transactionDetailHref / detailBackHref (tombol Kembali detail)", () => {
+  const ID = "4f9e7a5c-2d6b-4f1e-9a0c-5b6c7d8e9f0a";
+
+  it("tautan detail membawa penanda from=list + filter daftar", () => {
+    expect(transactionDetailHref(ID, { month: CURRENT }, CURRENT)).toBe(
+      `/transactions/${ID}?from=list`,
+    );
+    expect(
+      transactionDetailHref(
+        ID,
+        { month: "2026-08", type: "EXPENSE", categoryIds: [MAKAN] },
+        CURRENT,
+      ),
+    ).toBe(
+      `/transactions/${ID}?from=list&month=2026-08&type=expense&category=${MAKAN}`,
+    );
+  });
+
+  it("dari daftar → kembali ke daftar dengan filter yang sama", () => {
+    const href = transactionDetailHref(
+      ID,
+      { month: "2026-08", categoryIds: [MAKAN] },
+      CURRENT,
+    );
+    const params = new URL(href, "http://x").searchParams;
+    expect(detailBackHref(params, "2026-05", CURRENT)).toBe(
+      `/transactions?month=2026-08&category=${MAKAN}`,
+    );
+    expect(detailBackHref({ from: "list" }, "2026-05", CURRENT)).toBe(
+      "/transactions",
+    );
+  });
+
+  it("tanpa penanda (tautan langsung) → daftar bulan transaksi", () => {
+    expect(detailBackHref({}, "2026-05", CURRENT)).toBe(
+      "/transactions?month=2026-05",
+    );
+    expect(
+      detailBackHref({ month: "2026-01", category: MAKAN }, "2026-05", CURRENT),
+    ).toBe("/transactions?month=2026-05");
+  });
+
+  it("nilai berbahaya diabaikan — selalu path internal /transactions", () => {
+    const href = detailBackHref(
+      { from: "list", month: "//evil.com", type: "javascript:x" },
+      "2026-05",
+      CURRENT,
+    );
+    expect(href).toBe("/transactions");
   });
 });

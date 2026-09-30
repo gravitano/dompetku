@@ -15,6 +15,7 @@ import {
 } from "~/modules/transactions/list";
 import {
   TRANSACTION_LIST_MESSAGES as M,
+  transactionDetailHref,
   type TransactionListFilter,
 } from "~/modules/transactions/schema";
 
@@ -22,6 +23,8 @@ import { NetAmount, TransactionAmount } from "./transaction-amount";
 
 type TransactionListProps = {
   filter: TransactionListFilter;
+  /** "YYYY-MM" bulan berjalan — untuk tautan detail yang membawa filter. */
+  currentMonth: string;
   /** Halaman pertama dari server (RSC); halaman berikutnya via Server Action. */
   firstPage: TransactionListPage;
 };
@@ -33,12 +36,18 @@ type ListState = {
   status: "idle" | "loading" | "error";
 };
 
-function TransactionRow({ transaction }: { transaction: TransactionListItem }) {
+function TransactionRow({
+  transaction,
+  href,
+}: {
+  transaction: TransactionListItem;
+  href: string;
+}) {
   const { category } = transaction;
   return (
     <li>
       <Link
-        href={`/transactions/${transaction.id}`}
+        href={href}
         data-testid={`transaction-row-${transaction.id}`}
         data-transaction-id={transaction.id}
         data-date={transaction.date}
@@ -78,7 +87,11 @@ function TransactionRow({ transaction }: { transaction: TransactionListItem }) {
  * total bersih harian, infinite scroll 50 per halaman, error memuat dengan
  * "Coba lagi" (data yang sudah tampil tetap ada). Tap baris → detail.
  */
-export function TransactionList({ filter, firstPage }: TransactionListProps) {
+export function TransactionList({
+  filter,
+  currentMonth,
+  firstPage,
+}: TransactionListProps) {
   const [state, setState] = useState<ListState>({
     base: firstPage,
     page: firstPage,
@@ -165,7 +178,15 @@ export function TransactionList({ filter, firstPage }: TransactionListProps) {
           </div>
           <ul className="divide-y overflow-hidden rounded-xl border bg-card">
             {group.items.map((transaction) => (
-              <TransactionRow key={transaction.id} transaction={transaction} />
+              <TransactionRow
+                key={transaction.id}
+                transaction={transaction}
+                href={transactionDetailHref(
+                  transaction.id,
+                  filter,
+                  currentMonth,
+                )}
+              />
             ))}
           </ul>
         </section>

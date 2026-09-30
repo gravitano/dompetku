@@ -133,7 +133,11 @@ export function TransactionsView({
           }
         />
       ) : (
-        <TransactionList filter={filter} firstPage={firstPage} />
+        <TransactionList
+          filter={filter}
+          currentMonth={currentMonth}
+          firstPage={firstPage}
+        />
       )}
 
       <AddTransactionButton categories={formCategories} />

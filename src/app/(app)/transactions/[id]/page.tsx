@@ -1,12 +1,14 @@
+import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
 import { CategoryIcon } from "~/components/categories/category-icon";
 import { PageHeader } from "~/components/layout/page-header";
-import { BackToListLink } from "~/components/transactions/back-to-list-link";
 import { TransactionAmount } from "~/components/transactions/transaction-amount";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import {
   formatDate,
   formatDayLabel,
@@ -15,7 +17,7 @@ import {
 } from "~/lib/date";
 import { requireUserOrRedirect } from "~/lib/session";
 import { getTransactionDetail } from "~/modules/transactions/queries";
-import { transactionListHref } from "~/modules/transactions/schema";
+import { detailBackHref } from "~/modules/transactions/schema";
 
 export const metadata: Metadata = { title: "Detail Transaksi" };
 
@@ -33,6 +35,7 @@ const RECORDED_TIME = new Intl.DateTimeFormat("id-ID", {
  */
 export default async function Page({
   params,
+  searchParams,
 }: PageProps<"/transactions/[id]">) {
   const user = await requireUserOrRedirect();
   const { id } = await params;
@@ -41,6 +44,11 @@ export default async function Page({
   const transaction = await getTransactionDetail(user.id, id);
   if (!transaction) notFound();
 
+  // Kembali ke daftar asal (filter dari `?from=list&...`) atau bulan transaksi.
+  const backHref = detailBackHref(
+    await searchParams,
+    transaction.date.slice(0, 7),
+  );
   const date = parseDateOnly(transaction.date);
   const recordedAt = new Date(transaction.createdAt);
   const rows = [
@@ -71,11 +79,12 @@ export default async function Page({
 
   return (
     <div data-testid="transaction-detail" className="flex flex-col gap-4">
-      <BackToListLink
-        fallbackHref={transactionListHref({
-          month: transaction.date.slice(0, 7),
-        })}
-      />
+      <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
+        <Link href={backHref} data-testid="transaction-detail-back">
+          <ArrowLeftIcon aria-hidden />
+          Kembali
+        </Link>
+      </Button>
       <PageHeader title="Detail Transaksi" />
       <div className="rounded-xl border bg-card p-4">
         <TransactionAmount

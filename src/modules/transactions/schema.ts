@@ -249,6 +249,42 @@ export function transactionListHref(
   return search ? `/transactions?${search}` : "/transactions";
 }
 
+/** Penanda detail dibuka dari daftar (`?from=list`), lihat `transactionDetailHref`. */
+export const FROM_LIST_PARAM = { name: "from", value: "list" } as const;
+
+/**
+ * Tautan detail transaksi dari daftar: membawa penanda `from=list` + filter
+ * daftar yang aktif, agar tombol Kembali kembali ke daftar yang sama tanpa
+ * bergantung pada riwayat browser.
+ */
+export function transactionDetailHref(
+  id: string,
+  filter: Partial<TransactionListFilter>,
+  currentMonth: string = currentMonthKey(),
+): string {
+  const search = transactionListSearch(filter, currentMonth);
+  const from = `${FROM_LIST_PARAM.name}=${FROM_LIST_PARAM.value}`;
+  return `/transactions/${id}?${from}${search ? `&${search}` : ""}`;
+}
+
+/**
+ * Tujuan tombol Kembali di detail: daftar dengan filter asal bila dibuka dari
+ * daftar (`from=list`, filter divalidasi ulang — hanya path internal
+ * `/transactions`), selain itu daftar bulan transaksi tsb (`fallbackMonth`).
+ */
+export function detailBackHref(
+  params: SearchParamsInput,
+  fallbackMonth: string,
+  currentMonth: string = currentMonthKey(),
+): string {
+  const fromList =
+    getAllParams(params, FROM_LIST_PARAM.name)[0] === FROM_LIST_PARAM.value;
+  const filter = fromList
+    ? parseTransactionListParams(params, currentMonth)
+    : { month: fallbackMonth };
+  return transactionListHref(filter, currentMonth);
+}
+
 /** Kategori minimal untuk validasi filter. */
 export type FilterableCategory = { id: string; type: TransactionType };
 
