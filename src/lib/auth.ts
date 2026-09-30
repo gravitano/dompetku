@@ -50,7 +50,9 @@ export const auth = betterAuth({
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== SIGN_IN_EMAIL_PATH) return;
       const email = readSignInEmail(ctx.body);
-      if (email && loginLockout.status(email).locked) {
+      // Reservasi dulu (increment sebelum verifikasi) agar burst paralel
+      // tidak bisa mencoba lebih dari 5 password.
+      if (email && loginLockout.reserveAttempt(email).locked) {
         throw new APIError("TOO_MANY_REQUESTS", {
           code: LOGIN_LOCKED_ERROR_CODE,
           message: LOGIN_MESSAGES.locked,
@@ -63,8 +65,9 @@ export const auth = betterAuth({
       if (!email) return;
       const returned = ctx.context.returned;
       if (isAPIError(returned)) {
-        // 401 = email/password salah; error lain (validasi, sistem) tidak dihitung.
-        if (returned.statusCode === 401) loginLockout.recordFailure(email);
+        // 401 = email/password salah → reservasi tetap terhitung sebagai gagal.
+        // Error lain (validasi, sistem) tidak dihitung.
+        if (returned.statusCode !== 401) loginLockout.release(email);
         return;
       }
       loginLockout.reset(email);

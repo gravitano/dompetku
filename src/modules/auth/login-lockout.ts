@@ -6,6 +6,12 @@
  * - Dihitung per email (lowercase), termasuk email yang tidak terdaftar agar
  *   respons tidak membocorkan keberadaan akun.
  * - Login berhasil sebelum batas me-reset penghitung.
+ * - Anti race check-then-act: setiap percobaan DIRESERVASI (dihitung) sebelum
+ *   password diverifikasi (`reserveAttempt` di hook before). Berhasil →
+ *   `reset`; gagal karena selain kredensial salah (validasi dsb.) → `release`.
+ *   Burst paralel tidak bisa mencoba lebih dari 5 password per window.
+ *   Bila handler melempar exception non-API (after hook tidak jalan),
+ *   reservasi tetap terhitung sebagai gagal (fail-closed) sampai window habis.
  * - In-memory: cukup karena 1 container app per environment (ITA §8).
  *   Dipasang sebagai hook better-auth di `~/lib/auth` sehingga berlaku untuk
  *   `loginAction` maupun endpoint HTTP `/api/auth/sign-in/email`.
@@ -24,13 +30,22 @@ export type LockStatus = {
 
 export type LoginLockout = {
   status: (email: string) => LockStatus;
-  recordFailure: (email: string) => LockStatus;
+  /**
+   * Reservasi 1 percobaan. `locked: true` → tolak tanpa memverifikasi
+   * password. Percobaan ke-5 langsung mengunci sampai terbukti berhasil
+   * (`reset`), sehingga percobaan paralel ke-6 selalu ditolak.
+   */
+  reserveAttempt: (email: string) => LockStatus;
+  /** Batalkan reservasi (gagal bukan karena kredensial salah). */
+  release: (email: string) => void;
+  /** Login berhasil: hapus penghitung & kunci. */
   reset: (email: string) => void;
   clear: () => void;
 };
 
 type Entry = {
-  failures: number;
+  /** Percobaan yang direservasi (gagal + sedang berjalan). */
+  attempts: number;
   /** Akhir window penghitungan (dimulai dari kegagalan pertama). */
   windowEndsAt: number;
   lockedUntil: number;
@@ -70,21 +85,26 @@ export function createLoginLockout({
     status(email) {
       return statusOf(entries.get(normalizeLoginEmail(email)), now());
     },
-    recordFailure(email) {
+    reserveAttempt(email) {
       const key = normalizeLoginEmail(email);
       const time = now();
       if (entries.size > 10_000) prune(time);
 
       let entry = entries.get(key);
-      if (!entry || (entry.windowEndsAt <= time && entry.lockedUntil <= time)) {
-        entry = { failures: 0, windowEndsAt: time + windowMs, lockedUntil: 0 };
+      if (entry && entry.lockedUntil > time) return statusOf(entry, time);
+      if (!entry || entry.windowEndsAt <= time) {
+        entry = { attempts: 0, windowEndsAt: time + windowMs, lockedUntil: 0 };
         entries.set(key, entry);
       }
-      entry.failures += 1;
-      if (entry.failures >= maxFailures && entry.lockedUntil <= time) {
-        entry.lockedUntil = time + windowMs;
-      }
-      return statusOf(entry, time);
+      entry.attempts += 1;
+      if (entry.attempts >= maxFailures) entry.lockedUntil = time + windowMs;
+      return { locked: false, retryAfterMs: 0 };
+    },
+    release(email) {
+      const entry = entries.get(normalizeLoginEmail(email));
+      if (!entry || entry.attempts === 0) return;
+      entry.attempts -= 1;
+      if (entry.attempts < maxFailures) entry.lockedUntil = 0;
     },
     reset(email) {
       entries.delete(normalizeLoginEmail(email));

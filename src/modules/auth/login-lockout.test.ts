@@ -26,60 +26,98 @@ describe("createLoginLockout", () => {
     expect(LOGIN_LOCK_WINDOW_MS).toBe(15 * 60 * 1000);
   });
 
-  it("terkunci setelah 5 kali gagal untuk email yang sama", () => {
+  it("5 percobaan gagal diizinkan, percobaan ke-6 ditolak", () => {
     const { lockout } = setup();
-    for (let i = 1; i < LOGIN_MAX_FAILURES; i++) {
-      expect(lockout.recordFailure(EMAIL).locked).toBe(false);
-      expect(lockout.status(EMAIL).locked).toBe(false);
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) {
+      expect(lockout.reserveAttempt(EMAIL).locked).toBe(false);
     }
-    expect(lockout.recordFailure(EMAIL)).toEqual({
+    expect(lockout.status(EMAIL)).toEqual({
       locked: true,
       retryAfterMs: LOGIN_LOCK_WINDOW_MS,
     });
-    expect(lockout.status(EMAIL).locked).toBe(true);
+    // Termasuk dengan password benar: ditolak sebelum diverifikasi.
+    expect(lockout.reserveAttempt(EMAIL).locked).toBe(true);
+  });
+
+  it("burst paralel tidak bisa mencoba lebih dari 5 password", () => {
+    const { lockout } = setup();
+    // 20 request datang bersamaan sebelum ada yang selesai diverifikasi.
+    const allowed = Array.from({ length: 20 }, () =>
+      lockout.reserveAttempt(EMAIL),
+    ).filter((status) => !status.locked);
+    expect(allowed).toHaveLength(LOGIN_MAX_FAILURES);
+  });
+
+  it("percobaan ke-5 yang berhasil (reset) membuka kunci", () => {
+    const { lockout } = setup();
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) lockout.reserveAttempt(EMAIL);
+    lockout.reset(EMAIL);
+    expect(lockout.status(EMAIL).locked).toBe(false);
+    expect(lockout.reserveAttempt(EMAIL).locked).toBe(false);
+  });
+
+  it("release membatalkan reservasi (gagal bukan karena kredensial)", () => {
+    const { lockout } = setup();
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) lockout.reserveAttempt(EMAIL);
+    lockout.release(EMAIL);
+    expect(lockout.status(EMAIL).locked).toBe(false);
+    expect(lockout.reserveAttempt(EMAIL).locked).toBe(false);
+    expect(lockout.reserveAttempt(EMAIL).locked).toBe(true);
+    // release tanpa reservasi tidak membuat penghitung negatif.
+    lockout.release("baru@example.com");
+    expect(lockout.status("baru@example.com").locked).toBe(false);
   });
 
   it("email dinormalisasi (huruf besar/kecil & spasi)", () => {
     const { lockout } = setup();
     for (let i = 0; i < LOGIN_MAX_FAILURES; i++) {
-      lockout.recordFailure(i % 2 ? " Lock@Example.COM " : EMAIL);
+      lockout.reserveAttempt(i % 2 ? " Lock@Example.COM " : EMAIL);
     }
     expect(lockout.status("LOCK@example.com").locked).toBe(true);
   });
 
   it("tidak mempengaruhi email lain", () => {
     const { lockout } = setup();
-    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) lockout.recordFailure(EMAIL);
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) lockout.reserveAttempt(EMAIL);
     expect(lockout.status("budi@example.com").locked).toBe(false);
+    expect(lockout.reserveAttempt("budi@example.com").locked).toBe(false);
   });
 
   it("terbuka kembali setelah 15 menit", () => {
     const { lockout, advance } = setup();
-    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) lockout.recordFailure(EMAIL);
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) lockout.reserveAttempt(EMAIL);
     advance(LOGIN_LOCK_WINDOW_MS - 1);
     expect(lockout.status(EMAIL)).toEqual({ locked: true, retryAfterMs: 1 });
+    expect(lockout.reserveAttempt(EMAIL).locked).toBe(true);
     advance(1);
     expect(lockout.status(EMAIL).locked).toBe(false);
     // Penghitung mulai dari nol lagi.
-    expect(lockout.recordFailure(EMAIL).locked).toBe(false);
+    for (let i = 1; i < LOGIN_MAX_FAILURES; i++) {
+      lockout.reserveAttempt(EMAIL);
+    }
+    expect(lockout.status(EMAIL).locked).toBe(false);
   });
 
   it("kegagalan di luar window 15 menit tidak dihitung", () => {
     const { lockout, advance } = setup();
     for (let i = 0; i < LOGIN_MAX_FAILURES - 1; i++) {
-      lockout.recordFailure(EMAIL);
+      lockout.reserveAttempt(EMAIL);
     }
     advance(LOGIN_LOCK_WINDOW_MS);
-    expect(lockout.recordFailure(EMAIL).locked).toBe(false);
+    lockout.reserveAttempt(EMAIL);
+    expect(lockout.status(EMAIL).locked).toBe(false);
   });
 
   it("login berhasil (reset) mengosongkan penghitung", () => {
     const { lockout } = setup();
     for (let i = 0; i < LOGIN_MAX_FAILURES - 1; i++) {
-      lockout.recordFailure(EMAIL);
+      lockout.reserveAttempt(EMAIL);
     }
     lockout.reset(EMAIL);
-    expect(lockout.recordFailure(EMAIL).locked).toBe(false);
+    for (let i = 0; i < LOGIN_MAX_FAILURES - 1; i++) {
+      lockout.reserveAttempt(EMAIL);
+    }
+    expect(lockout.status(EMAIL).locked).toBe(false);
   });
 });
 
