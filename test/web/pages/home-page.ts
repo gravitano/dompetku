@@ -1,15 +1,18 @@
 import type { Locator, Page } from "@playwright/test";
 
 /**
- * Page Object Beranda (versi minimal E02-US01: total pengeluaran bulan ini +
- * transaksi terbaru). Selector mengikuti E04-US01 agar bisa dipakai ulang.
+ * Page Object Beranda (versi minimal E02-US01/US02: total pemasukan &
+ * pengeluaran bulan ini + transaksi terbaru). Selector mengikuti E04-US01 agar
+ * bisa dipakai ulang.
  */
 export class HomePage {
+  readonly incomeTotal: Locator;
   readonly expenseTotal: Locator;
   readonly recentItems: Locator;
   readonly recentEmpty: Locator;
 
   constructor(readonly page: Page) {
+    this.incomeTotal = page.getByTestId("summary-income-total");
     this.expenseTotal = page.getByTestId("summary-expense-total");
     this.recentItems = page.getByTestId("recent-transaction-item");
     this.recentEmpty = page.getByTestId("recent-transactions-empty");
@@ -17,6 +20,11 @@ export class HomePage {
 
   async goto() {
     await this.page.goto("/");
+  }
+
+  /** Total pemasukan bulan ini sebagai angka Rupiah. */
+  async incomeTotalValue(): Promise<number> {
+    return Number(await this.incomeTotal.getAttribute("data-value"));
   }
 
   /** Total pengeluaran bulan ini sebagai angka Rupiah. */
