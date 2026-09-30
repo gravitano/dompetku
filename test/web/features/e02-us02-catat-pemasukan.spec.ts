@@ -364,8 +364,8 @@ test.describe("Catat pemasukan", () => {
       );
       await expect(form.categoryManageLink).toHaveText("Kelola kategori");
       await expect(form.categoryManageLink).toHaveAttribute(
-        "aria-disabled",
-        "true",
+        "href",
+        "/categories?type=income",
       );
       await expect(form.submitButton).toBeDisabled();
 
@@ -373,6 +373,18 @@ test.describe("Catat pemasukan", () => {
       await form.selectType("expense");
       await expect(form.categoryEmpty).toBeHidden();
       await expect(form.submitButton).toBeEnabled();
+
+      // "Kelola kategori" membuka halaman Kategori tab Pemasukan (E02-US05).
+      await form.selectType("income");
+      await form.categoryManageLink.click();
+      await expect(page).toHaveURL(/\/categories\?type=income$/);
+      await expect(page.getByTestId("category-tab-income")).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await expect(page.getByTestId("category-archived-toggle")).toHaveText(
+        /Diarsipkan \(4\)/,
+      );
     });
 
     test("toggle bisa dipakai dengan keyboard (panah kiri/kanan)", async () => {

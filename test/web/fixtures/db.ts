@@ -38,6 +38,14 @@ export type StoredTransaction = {
   categoryName: string;
 };
 
+export type StoredCategory = {
+  id: string;
+  name: string;
+  type: "INCOME" | "EXPENSE";
+  icon: string | null;
+  archived: boolean;
+};
+
 /** Baris transaksi uji untuk di-insert langsung (tanpa UI). */
 export type SeedTransaction = {
   /** "YYYY-MM-DD". */
@@ -154,6 +162,47 @@ export class TestDb {
        WHERE user_id = $1 AND name = $2 AND type = $3::category_type`,
       [userId, name, type],
     );
+  }
+
+  /** Tambah kategori custom milik user (opsional langsung terarsip). */
+  async createCategory(
+    userId: string,
+    {
+      name,
+      type = "EXPENSE",
+      icon = "package",
+      archived = false,
+    }: {
+      name: string;
+      type?: "INCOME" | "EXPENSE";
+      icon?: string;
+      archived?: boolean;
+    },
+  ): Promise<string> {
+    const { rows } = await this.pool.query<{ id: string }>(
+      `INSERT INTO categories (id, user_id, name, type, icon, is_default, archived_at, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3::category_type, $4, false,
+               CASE WHEN $5 THEN now() END, now(), now())
+       RETURNING id`,
+      [userId, name, type, icon, archived],
+    );
+    return rows[0].id;
+  }
+
+  /** Semua kategori user (untuk assertion "tidak tersimpan" / status arsip). */
+  async getCategories(userId: string): Promise<StoredCategory[]> {
+    const { rows } = await this.pool.query<{
+      id: string;
+      name: string;
+      type: "INCOME" | "EXPENSE";
+      icon: string | null;
+      archived: boolean;
+    }>(
+      `SELECT id, name, type::text AS type, icon, archived_at IS NOT NULL AS archived
+       FROM categories WHERE user_id = $1 ORDER BY type, name`,
+      [userId],
+    );
+    return rows;
   }
 
   /**
