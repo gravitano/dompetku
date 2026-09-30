@@ -15,12 +15,13 @@
  * `?month=BASE` / tombol ◀ sehingga hasilnya sama di tanggal berapa pun
  * (termasuk tanggal 1). Skenario bulan berjalan hanya memakai tanggal hari ini.
  */
-import type { Page } from "@playwright/test";
 
 import { expect, test, type CreatedUser } from "../fixtures";
 import type { SeedTransaction, TestDb } from "../fixtures/db";
+import { failServerActions } from "../fixtures/server-actions";
 import { AppShell } from "../pages/app-shell";
 import { jakartaDate } from "../pages/home-page";
+import { TransactionDetailPage } from "../pages/transaction-detail";
 import { TransactionFormPage } from "../pages/transaction-form";
 import {
   dayLabel,
@@ -99,18 +100,6 @@ async function expectSummary(
 async function expectNotes(list: TransactionsPage, notes: string[]) {
   await expect(list.rows).toHaveCount(notes.length);
   expect((await list.notes()).toSorted()).toEqual(notes.toSorted());
-}
-
-/** Kegagalan Server Action (HTTP 500) — simulasi "server gagal merespons". */
-async function failServerActions(page: Page) {
-  await page.route("**/*", async (route) => {
-    const request = route.request();
-    if (request.method() === "POST" && request.headers()["next-action"]) {
-      await route.fulfill({ status: 500, body: "Internal Server Error" });
-      return;
-    }
-    await route.fallback();
-  });
 }
 
 test.describe("Daftar transaksi dengan filter", () => {
@@ -355,7 +344,7 @@ test.describe("Daftar transaksi dengan filter", () => {
       await expect(list.monthLabel).toHaveText(monthLabel(OLDER));
     });
 
-    test("tap baris membuka detail transaksi, kembali ke daftar terfilter", async ({
+    test("tap baris membuka detail transaksi, tutup kembali ke daftar terfilter", async ({
       page,
     }) => {
       await list.goto(`?month=${BASE}`);
@@ -365,29 +354,26 @@ test.describe("Daftar transaksi dengan filter", () => {
       const url = page.url();
       await list.row("Listrik").click();
 
-      const detail = page.getByTestId("transaction-detail");
-      await expect(detail).toBeVisible();
-      await expect(page.getByTestId("page-title")).toHaveText(
-        "Detail Transaksi",
+      // Detail (E02-US04): form terisi di sheet/dialog di atas daftar.
+      const detail = new TransactionDetailPage(page);
+      await expect(detail.sheet).toBeVisible();
+      await expect(detail.title).toHaveText("Detail Transaksi");
+      await expect(detail.form.amountInput).toHaveValue("Rp 350.000");
+      await expect(detail.form.category("tagihan")).toHaveAttribute(
+        "aria-checked",
+        "true",
       );
-      await expect(detail.getByTestId("transaction-amount")).toHaveText(
-        /^− .*Rp 350\.000$/,
-      );
-      await expect(
-        page.getByTestId("transaction-detail-category"),
-      ).toContainText("Tagihan");
-      await expect(page.getByTestId("transaction-detail-note")).toContainText(
-        "Listrik",
-      );
+      await expect(detail.form.noteInput).toHaveValue("Listrik");
 
-      // Kembali memakai filter yang dibawa tautan (bukan riwayat browser).
-      await page.getByTestId("transaction-detail-back").click();
+      // Tutup kembali ke daftar dengan filter yang sama.
+      await detail.close();
+      await expect(detail.sheet).toBeHidden();
       await expect(page).toHaveURL(url);
       await expect(list.chip("tagihan")).toBeVisible();
       await expectNotes(list, ["Listrik"]);
     });
 
-    test("detail dibuka lewat tautan langsung → Kembali ke daftar bulan transaksi", async ({
+    test("detail dibuka lewat tautan langsung → tutup ke daftar bulan transaksi", async ({
       page,
       db,
     }) => {
@@ -396,7 +382,9 @@ test.describe("Daftar transaksi dengan filter", () => {
       )!;
       // Tab baru tanpa riwayat daftar sebelumnya.
       await page.goto(`/transactions/${listrik.id}`);
-      await page.getByTestId("transaction-detail-back").click();
+      const detail = new TransactionDetailPage(page);
+      await expect(detail.sheet).toBeVisible();
+      await detail.close();
 
       await expect(page).toHaveURL(
         (url) =>
@@ -516,7 +504,7 @@ test.describe("Daftar transaksi dengan filter", () => {
       // Detail transaksi milik user lain → tidak ditemukan.
       await page.goto(`/transactions/${aniTransaction.id}`);
       await expect(page.getByTestId("transaction-not-found")).toBeVisible();
-      await expect(page.getByTestId("page-title")).toHaveText(
+      await expect(page.getByTestId("transaction-not-found-title")).toHaveText(
         "Transaksi tidak ditemukan",
       );
       await expect(page.getByText("Belanja Ani")).toHaveCount(0);

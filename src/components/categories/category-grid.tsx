@@ -111,6 +111,14 @@ export function CategoryGrid({
           >
             <CategoryIcon icon={category.icon} />
             <span className="line-clamp-2">{category.name}</span>
+            {category.archived ? (
+              <span
+                data-testid="category-archived-badge"
+                className="rounded-full bg-muted px-1.5 py-px text-[10px] leading-tight font-medium text-muted-foreground"
+              >
+                Diarsipkan
+              </span>
+            ) : null}
           </button>
         );
       })}

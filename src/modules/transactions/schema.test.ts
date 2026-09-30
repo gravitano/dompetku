@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   NOTE_MAX_LENGTH,
   TRANSACTION_MESSAGES as M,
+  transactionDeleteSchema,
   transactionSchema,
+  transactionUpdateSchema,
 } from "./schema";
 
 const CATEGORY_ID = "0b5a3c1e-8f2d-4b7a-9c6e-1d2f3a4b5c6d";
@@ -170,5 +172,61 @@ describe("transactionSchema", () => {
         }),
       ).sort(),
     ).toEqual(["amount", "categoryId", "transactionDate"]);
+  });
+});
+
+describe("transactionUpdateSchema / transactionDeleteSchema (E02-US04)", () => {
+  const ID = "5f0e4a7b-1c2d-4e3f-8a9b-0c1d2e3f4a5b";
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-30T03:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("menerima id + field form yang valid (aturan sama dengan catat)", () => {
+    const result = transactionUpdateSchema.safeParse({ ...valid, id: ID });
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({ id: ID, amount: 25_000 });
+  });
+
+  it("menolak id bukan UUID", () => {
+    expect(
+      transactionUpdateSchema.safeParse({ ...valid, id: "trx-ani-1" }).success,
+    ).toBe(false);
+    expect(transactionDeleteSchema.safeParse({ id: "1" }).success).toBe(false);
+    expect(transactionDeleteSchema.safeParse({ id: ID }).success).toBe(true);
+  });
+
+  it.each([
+    ["nominal 0", { amount: "0" }, "amount", M.amountMin],
+    [
+      "tanggal masa depan",
+      { transactionDate: "2026-10-01" },
+      "transactionDate",
+      M.dateFuture,
+    ],
+    [
+      "catatan > 100",
+      { note: "x".repeat(NOTE_MAX_LENGTH + 1) },
+      "note",
+      M.noteTooLong,
+    ],
+    [
+      "kategori kosong (jenis diubah)",
+      { categoryId: "" },
+      "categoryId",
+      M.categoryRequired,
+    ],
+  ])("validasi %s sama dengan catat", (_, patch, field, message) => {
+    const result = transactionUpdateSchema.safeParse({
+      ...valid,
+      ...patch,
+      id: ID,
+    });
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.find((issue) => issue.path[0] === field)?.message,
+    ).toBe(message);
   });
 });

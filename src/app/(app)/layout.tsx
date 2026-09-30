@@ -11,12 +11,14 @@ import { requireUserOrRedirect } from "~/lib/session";
 // divalidasi ke database (defense in depth, ITA §6.1). Layout ini membaca
 // session per request sehingga halaman selalu dinamis (`Cache-Control:
 // no-store`) — tombol back setelah logout selalu meminta ulang ke server.
-export default async function AppLayout({ children }: LayoutProps<"/">) {
+export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
   const user = await requireUserOrRedirect();
 
   return (
     <AppShell accountMenu={<AccountMenu name={user.name} email={user.email} />}>
       {children}
+      {/* Detail transaksi sebagai modal (intercepting route, E02-US04). */}
+      {modal}
       <BfcacheGuard />
       <Suspense fallback={null}>
         <WelcomeToast name={user.name} />

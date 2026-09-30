@@ -14,6 +14,12 @@ export type CategoryOption = {
   /** Dipakai untuk `data-testid="category-option-<slug>"`. */
   slug: string;
   isDefault: boolean;
+  /**
+   * Kategori terarsip yang masih dipakai transaksi yang sedang diubah
+   * (E02-US04 AC 6) — hanya untuk menampilkan pilihan saat ini, bukan pilihan
+   * baru.
+   */
+  archived?: boolean;
 };
 
 export type CategoryOptionsByType = Record<CategoryType, CategoryOption[]>;
