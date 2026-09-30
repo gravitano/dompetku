@@ -38,6 +38,19 @@ export type StoredTransaction = {
   categoryName: string;
 };
 
+/** Baris transaksi uji untuk di-insert langsung (tanpa UI). */
+export type SeedTransaction = {
+  /** "YYYY-MM-DD". */
+  date: string;
+  type: "INCOME" | "EXPENSE";
+  /** Nama kategori milik user (aktif maupun terarsip). */
+  category: string;
+  amount: number;
+  note?: string | null;
+  /** Waktu dicatat; default berurutan sesuai urutan array (terakhir = terbaru). */
+  createdAt?: Date;
+};
+
 export class TestDb {
   private readonly pool: Pool;
 
@@ -143,6 +156,61 @@ export class TestDb {
     );
   }
 
+  /**
+   * Insert transaksi langsung ke database (cepat, untuk data daftar &
+   * pagination). `created_at` disimpan dalam UTC seperti Prisma.
+   */
+  async insertTransactions(
+    userId: string,
+    rows: readonly SeedTransaction[],
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    const base = Date.now() - rows.length * 1000;
+    const { rowCount } = await this.pool.query(
+      `INSERT INTO transactions
+         (id, user_id, category_id, type, amount, transaction_date, note, created_at, updated_at)
+       SELECT gen_random_uuid(), $1, c.id, r.type::category_type, r.amount,
+              r.date::date, r.note,
+              r.created_at AT TIME ZONE 'UTC', r.created_at AT TIME ZONE 'UTC'
+       FROM unnest($2::text[], $3::text[], $4::bigint[], $5::text[], $6::text[], $7::timestamptz[])
+            AS r(category, type, amount, date, note, created_at)
+       JOIN categories c
+         ON c.user_id = $1 AND c.name = r.category AND c.type = r.type::category_type`,
+      [
+        userId,
+        rows.map((r) => r.category),
+        rows.map((r) => r.type),
+        rows.map((r) => String(r.amount)),
+        rows.map((r) => r.date),
+        rows.map((r) => r.note ?? null),
+        rows.map((r, i) =>
+          (r.createdAt ?? new Date(base + i * 1000)).toISOString(),
+        ),
+      ],
+    );
+    if (rowCount !== rows.length) {
+      throw new Error(
+        `insertTransactions: ${rowCount}/${rows.length} baris (kategori tidak ditemukan?)`,
+      );
+    }
+  }
+
+  /** Id kategori milik user berdasarkan nama & jenis. */
+  async getCategoryId(
+    userId: string,
+    name: string,
+    type: "INCOME" | "EXPENSE" = "EXPENSE",
+  ): Promise<string> {
+    const { rows } = await this.pool.query<{ id: string }>(
+      `SELECT id FROM categories
+       WHERE user_id = $1 AND name = $2 AND type = $3::category_type
+       ORDER BY archived_at NULLS FIRST LIMIT 1`,
+      [userId, name, type],
+    );
+    if (!rows[0]) throw new Error(`Kategori ${type}:${name} tidak ditemukan`);
+    return rows[0].id;
+  }
+
   /** Semua transaksi user, terbaru dulu. */
   async getTransactions(userId: string): Promise<StoredTransaction[]> {
     const { rows } = await this.pool.query<{
@@ -158,7 +226,7 @@ export class TestDb {
               t.note, c.name AS category_name
        FROM transactions t JOIN categories c ON c.id = t.category_id
        WHERE t.user_id = $1
-       ORDER BY t.transaction_date DESC, t.created_at DESC`,
+       ORDER BY t.transaction_date DESC, t.created_at DESC, t.id DESC`,
       [userId],
     );
     return rows.map((row) => ({

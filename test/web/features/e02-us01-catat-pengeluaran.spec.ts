@@ -17,6 +17,7 @@ import {
 import { AppShell } from "../pages/app-shell";
 import { HomePage, jakartaDate } from "../pages/home-page";
 import { TransactionFormPage } from "../pages/transaction-form";
+import { TransactionsPage } from "../pages/transactions-page";
 
 const MESSAGES = {
   saved: "Pengeluaran tersimpan",
@@ -114,7 +115,10 @@ test.describe("Catat pengeluaran", () => {
       await form.submit();
 
       await expect(form.toast(MESSAGES.saved)).toBeVisible();
-      await expect(home.item("Tiket bioskop")).toBeVisible();
+      // Tab Transaksi memakai daftar per tanggal (E02-US03).
+      await expect(
+        new TransactionsPage(page).row("Tiket bioskop"),
+      ).toBeVisible();
     });
 
     test("transaksi terbaru tampil paling atas dan total bulan ini terakumulasi", async () => {
