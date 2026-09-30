@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-02---pencatatan-transaksi/e02-us03--daftar-transaksi---story.md
-status: in-progress
+status: implemented
 branch: dev/e02-us03--daftar-transaksi
 ---
 
