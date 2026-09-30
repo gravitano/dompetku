@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { formatRupiah, getInitials } from "./format";
+import {
+  AMOUNT_INPUT_MAX_DIGITS,
+  formatAmountInput,
+  formatRupiah,
+  getInitials,
+  parseAmountInput,
+} from "./format";
 
 describe("formatRupiah", () => {
   it.each([
@@ -38,5 +44,39 @@ describe("getInitials", () => {
     ["   ", "?"],
   ])("%j → %s", (name, expected) => {
     expect(getInitials(name)).toBe(expected);
+  });
+});
+
+describe("parseAmountInput", () => {
+  it.each([
+    ["", ""],
+    ["Rp ", ""],
+    ["25000", "25000"],
+    ["Rp 1.500.000", "1500000"],
+    ["Rp 1.500.0009", "15000009"],
+    ["0", "0"],
+    ["000", "0"],
+    ["007", "7"],
+    ["abc", ""],
+    ["-5", "5"],
+    ["1,5", "15"],
+  ])("%j → %j", (input, expected) => {
+    expect(parseAmountInput(input)).toBe(expected);
+  });
+
+  it(`maksimal ${AMOUNT_INPUT_MAX_DIGITS} digit`, () => {
+    expect(parseAmountInput("12345678901234567")).toBe("1234567890123");
+  });
+});
+
+describe("formatAmountInput", () => {
+  it.each([
+    ["", ""],
+    ["0", "Rp 0"],
+    ["25000", "Rp 25.000"],
+    ["1500000", "Rp 1.500.000"],
+    ["1000000001", "Rp 1.000.000.001"],
+  ])("%j → %j", (input, expected) => {
+    expect(formatAmountInput(input)).toBe(expected);
   });
 });
