@@ -6,6 +6,7 @@ import {
   LogOutIcon,
   TagsIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -103,11 +104,12 @@ export function AccountMenu({ name, email }: AccountMenuProps) {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {/* Kelola kategori dibuat di story E02-US05. */}
-        <DropdownMenuItem disabled data-testid="account-menu-categories">
-          <TagsIcon aria-hidden />
-          Kategori
-          <span className="ml-auto text-xs text-muted-foreground">Segera</span>
+        {/* Kelola kategori (E02-US05 UX-01). */}
+        <DropdownMenuItem asChild>
+          <Link href="/categories" data-testid="account-menu-categories">
+            <TagsIcon aria-hidden />
+            Kategori
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

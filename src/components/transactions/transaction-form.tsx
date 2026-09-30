@@ -33,6 +33,7 @@ import type {
   CategoryOption,
   CategoryOptionsByType,
 } from "~/modules/categories/options";
+import { categoriesHref } from "~/modules/categories/schema";
 import {
   createTransactionAction,
   updateTransactionAction,
@@ -414,7 +415,9 @@ export function TransactionForm({
                 }
                 tone={type === "INCOME" ? "income" : "expense"}
                 emptyMessage={TRANSACTION_MESSAGES.noCategories[type]}
-                emptyAction={<ManageCategoriesLink />}
+                emptyAction={
+                  <ManageCategoriesLink href={categoriesHref(type)} />
+                }
               />
             )}
           />
