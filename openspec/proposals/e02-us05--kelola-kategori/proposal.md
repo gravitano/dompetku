@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-02---pencatatan-transaksi/e02-us05--kelola-kategori---story.md
-status: in-progress
+status: implemented
 branch: dev/e02-us05--kelola-kategori
 ---
 
@@ -77,3 +77,19 @@ laporan per kategori kehilangan makna (BRD FEAT-006, Should Have). Saat ini menu
 - **Mengarsipkan kategori aktif terakhir:** tombol tetap bisa ditekan dan server menolak dengan pesan
   "Minimal harus ada 1 kategori aktif" (sama dengan skenario QA); aturan sama berlaku untuk menghapus kategori aktif
   terakhir.
+
+## Follow-up review E02-US04 (commit terpisah)
+
+- **Simpan perubahan** di detail transaksi membandingkan nilai ternormalisasi (catatan di-trim, nominal tanpa nol di
+  depan) dengan data awal — spasi di belakang catatan saja tidak lagi mengaktifkan tombol / "Buang perubahan?".
+- Detail sebagai modal (intercepted): setelah simpan/hapus memakai `router.back()` (ditunda sampai hasil revalidate
+  Server Action ter-commit, lalu `router.refresh()`), bukan `router.replace(backHref)` — tidak ada entri riwayat
+  ganda, Back pertama langsung kembali ke halaman sebelum daftar. Tautan langsung tetap `router.replace(backHref)`.
+
+## Catatan untuk EPIC-003 Anggaran
+
+- Kategori terarsip tetap punya `budgets` (tidak dihapus). EPIC-003 perlu memutuskan: anggaran bulan berjalan untuk
+  kategori terarsip tetap tampil/dihitung atau disembunyikan, dan kategori terarsip tidak boleh menjadi pilihan
+  anggaran baru (pakai `getActiveCategories`).
+- Menghapus kategori (hanya yang belum dipakai transaksi) ikut menghapus anggarannya (FK `onDelete: Cascade`);
+  pertimbangkan menolak hapus bila kategori punya anggaran, atau tampilkan peringatan.
