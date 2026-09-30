@@ -38,7 +38,10 @@ export const TRANSACTION_MESSAGES = {
     EXPENSE: "Pengeluaran tersimpan",
     INCOME: "Pemasukan tersimpan",
   },
-  noCategories: "Belum ada kategori",
+  noCategories: {
+    EXPENSE: "Belum ada kategori pengeluaran",
+    INCOME: "Belum ada kategori pemasukan",
+  },
 } as const;
 
 function isValidDateOnly(value: string): boolean {

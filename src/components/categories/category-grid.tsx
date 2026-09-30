@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
 import type { CategoryOption } from "~/modules/categories/options";
@@ -16,7 +16,16 @@ type CategoryGridProps = {
   describedBy?: string;
   labelledBy?: string;
   emptyMessage: string;
+  /** Aksi di empty state, mis. tautan "Kelola kategori" (E02-US02). */
+  emptyAction?: ReactNode;
+  /** Warna aksen pilihan: pengeluaran (default) atau pemasukan (hijau). */
+  tone?: "expense" | "income";
 };
+
+const CHECKED_TONE = {
+  expense: "border-primary bg-primary/10 ring-primary hover:bg-primary/10",
+  income: "border-income bg-income/10 ring-income hover:bg-income/10",
+} as const;
 
 /**
  * Grid ikon + label kategori (E02-US01 UX-02): satu tap memilih, hanya satu
@@ -31,18 +40,21 @@ export function CategoryGrid({
   describedBy,
   labelledBy,
   emptyMessage,
+  emptyAction,
+  tone = "expense",
 }: CategoryGridProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
 
   if (categories.length === 0) {
     return (
-      <p
+      <div
         id={id}
         data-testid="category-empty"
-        className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground"
+        className="flex flex-col items-center gap-1 rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground"
       >
-        {emptyMessage}
-      </p>
+        <p data-testid="category-empty-message">{emptyMessage}</p>
+        {emptyAction}
+      </div>
     );
   }
 
@@ -86,13 +98,14 @@ export function CategoryGrid({
             aria-checked={checked}
             data-state={checked ? "checked" : "unchecked"}
             data-testid={`category-option-${category.slug}`}
+            data-tone={tone}
             tabIndex={tabbable ? 0 : -1}
             onClick={() => onChange(category.id)}
             onKeyDown={(event) => onKeyDown(event, index)}
             className={cn(
               "flex min-h-18 flex-col items-center justify-center gap-1 rounded-xl border bg-background px-1 py-2 text-center text-xs leading-tight transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
               checked &&
-                "border-primary bg-primary/10 font-medium text-foreground ring-1 ring-primary hover:bg-primary/10",
+                cn("font-medium text-foreground ring-1", CHECKED_TONE[tone]),
               invalid && !checked && "border-destructive/50",
             )}
           >
