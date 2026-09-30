@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TRANSACTION_MESSAGES as M } from "./schema";
+import {
+  TRANSACTION_EDIT_MESSAGES as E,
+  TRANSACTION_MESSAGES as M,
+} from "./schema";
 
 const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
@@ -8,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   revalidatePath: vi.fn(),
   getTransactionListPage: vi.fn(),
+  findTransaction: vi.fn(),
+  updateMany: vi.fn(),
+  deleteMany: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -15,7 +21,12 @@ vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("~/lib/prisma", () => ({
   prisma: {
     category: { findFirst: mocks.findFirst },
-    transaction: { create: mocks.create },
+    transaction: {
+      create: mocks.create,
+      findFirst: mocks.findTransaction,
+      updateMany: mocks.updateMany,
+      deleteMany: mocks.deleteMany,
+    },
   },
 }));
 vi.mock("./queries", () => ({
@@ -31,8 +42,12 @@ vi.mock("~/lib/session", async () => {
   return { requireUser: mocks.requireUser, UnauthorizedError };
 });
 
-const { createTransactionAction, loadTransactionPageAction } =
-  await import("./actions");
+const {
+  createTransactionAction,
+  deleteTransactionAction,
+  loadTransactionPageAction,
+  updateTransactionAction,
+} = await import("./actions");
 const { UnauthorizedError } = await import("~/lib/session");
 
 const USER_ID = "user-budi";
@@ -300,6 +315,215 @@ describe("loadTransactionPageAction (E02-US03 infinite scroll)", () => {
     expect(result).toEqual({
       success: false,
       error: { code: "INTERNAL_ERROR", message: "Gagal memuat transaksi." },
+    });
+  });
+});
+
+describe("updateTransactionAction (E02-US04)", () => {
+  const NEW_CATEGORY_ID = "7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f";
+  const update = { ...valid, id: TRANSACTION_ID, amount: "30000" };
+  const NOT_FOUND = {
+    success: false,
+    error: { code: "NOT_FOUND", message: E.notFound },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-30T03:00:00Z"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.requireUser.mockResolvedValue({ id: USER_ID, name: "Budi" });
+    mocks.findTransaction.mockResolvedValue({
+      categoryId: CATEGORY_ID,
+      type: "EXPENSE",
+    });
+    mocks.findFirst.mockResolvedValue({ id: CATEGORY_ID });
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it("mengubah transaksi milik user session (where id + userId) lalu revalidate", async () => {
+    const result = await updateTransactionAction({
+      ...update,
+      userId: "user-lain",
+    });
+
+    expect(result).toEqual({ success: true, data: { id: TRANSACTION_ID } });
+    expect(mocks.findTransaction).toHaveBeenCalledWith({
+      where: { id: TRANSACTION_ID, userId: USER_ID },
+      select: { categoryId: true, type: true },
+    });
+    expect(mocks.updateMany).toHaveBeenCalledWith({
+      where: { id: TRANSACTION_ID, userId: USER_ID },
+      data: {
+        categoryId: CATEGORY_ID,
+        type: "EXPENSE",
+        amount: BigInt(30_000),
+        transactionDate: new Date("2026-09-30T00:00:00Z"),
+        note: "Makan siang",
+      },
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("transaksi milik user lain / tidak ada → NOT_FOUND tanpa mengubah data", async () => {
+    mocks.findTransaction.mockResolvedValue(null);
+
+    const result = await updateTransactionAction(update);
+
+    expect(result).toEqual(NOT_FOUND);
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("terhapus di antara cek & update (count 0) → NOT_FOUND", async () => {
+    mocks.updateMany.mockResolvedValue({ count: 0 });
+    expect(await updateTransactionAction(update)).toEqual(NOT_FOUND);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["id bukan UUID", { ...update, id: "trx-ani-1" }],
+    ["tanpa id", { ...valid }],
+    ["input null", null],
+  ])("%s → NOT_FOUND tanpa query", async (_, input) => {
+    expect(await updateTransactionAction(input)).toEqual(NOT_FOUND);
+    expect(mocks.findTransaction).not.toHaveBeenCalled();
+  });
+
+  it("validasi field sama dengan catat → VALIDATION_ERROR tanpa query", async () => {
+    const result = await updateTransactionAction({
+      ...update,
+      amount: "0",
+      transactionDate: "2026-10-01",
+    });
+    expect(result).toMatchObject({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        details: expect.arrayContaining([
+          { field: "amount", message: M.amountMin },
+          { field: "transactionDate", message: M.dateFuture },
+        ]),
+      },
+    });
+    expect(mocks.findTransaction).not.toHaveBeenCalled();
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("kategori tidak berubah → boleh walau sudah terarsip (tanpa filter archivedAt)", async () => {
+    await updateTransactionAction(update);
+    expect(mocks.findFirst).toHaveBeenCalledWith({
+      where: { id: CATEGORY_ID, userId: USER_ID, type: "EXPENSE" },
+      select: { id: true },
+    });
+  });
+
+  it("kategori baru wajib aktif, milik user, dan jenis cocok", async () => {
+    mocks.findFirst.mockResolvedValue({ id: NEW_CATEGORY_ID });
+    await updateTransactionAction({ ...update, categoryId: NEW_CATEGORY_ID });
+    expect(mocks.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: NEW_CATEGORY_ID,
+        userId: USER_ID,
+        type: "EXPENSE",
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+  });
+
+  it("jenis diubah → kategori (walau id sama) harus aktif & berjenis baru", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+    const result = await updateTransactionAction({ ...update, type: "INCOME" });
+    expect(mocks.findFirst.mock.calls[0][0].where).toEqual({
+      id: CATEGORY_ID,
+      userId: USER_ID,
+      type: "INCOME",
+      archivedAt: null,
+    });
+    expect(result).toEqual({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: M.categoryInvalid,
+        details: [{ field: "categoryId", message: M.categoryInvalid }],
+      },
+    });
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("belum login → UNAUTHORIZED tanpa menyentuh database", async () => {
+    mocks.requireUser.mockRejectedValue(new UnauthorizedError());
+    const result = await updateTransactionAction(update);
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: "UNAUTHORIZED" },
+    });
+    expect(mocks.findTransaction).not.toHaveBeenCalled();
+  });
+
+  it("kesalahan database → INTERNAL_ERROR 'Gagal menyimpan perubahan. Coba lagi.'", async () => {
+    mocks.updateMany.mockRejectedValue(new Error("db down"));
+    expect(await updateTransactionAction(update)).toEqual({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: E.updateError },
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteTransactionAction (E02-US04)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.requireUser.mockResolvedValue({ id: USER_ID, name: "Budi" });
+    mocks.deleteMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("menghapus transaksi milik user session lalu revalidate", async () => {
+    const result = await deleteTransactionAction({
+      id: TRANSACTION_ID,
+      userId: "user-lain",
+    });
+    expect(result).toEqual({ success: true, data: { id: TRANSACTION_ID } });
+    expect(mocks.deleteMany).toHaveBeenCalledWith({
+      where: { id: TRANSACTION_ID, userId: USER_ID },
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("transaksi milik user lain / sudah dihapus → NOT_FOUND 'Transaksi tidak ditemukan'", async () => {
+    mocks.deleteMany.mockResolvedValue({ count: 0 });
+    expect(await deleteTransactionAction({ id: TRANSACTION_ID })).toEqual({
+      success: false,
+      error: { code: "NOT_FOUND", message: E.notFound },
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("id bukan UUID → NOT_FOUND tanpa query", async () => {
+    expect(await deleteTransactionAction({ id: "trx-ani-1" })).toMatchObject({
+      success: false,
+      error: { code: "NOT_FOUND" },
+    });
+    expect(mocks.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("belum login → UNAUTHORIZED tanpa query", async () => {
+    mocks.requireUser.mockRejectedValue(new UnauthorizedError());
+    expect(await deleteTransactionAction({ id: TRANSACTION_ID })).toMatchObject(
+      { success: false, error: { code: "UNAUTHORIZED" } },
+    );
+    expect(mocks.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("kesalahan database → INTERNAL_ERROR 'Gagal menghapus transaksi. Coba lagi.'", async () => {
+    mocks.deleteMany.mockRejectedValue(new Error("db down"));
+    expect(await deleteTransactionAction({ id: TRANSACTION_ID })).toEqual({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: E.deleteError },
     });
   });
 });

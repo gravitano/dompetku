@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   countActiveFilters,
   detailBackHref,
+  homeDetailHref,
   normalizeTransactionListFilter,
   parseTransactionListParams,
   TRANSACTION_FILTER_MAX_CATEGORIES,
@@ -269,5 +270,12 @@ describe("transactionDetailHref / detailBackHref (tombol Kembali detail)", () =>
       CURRENT,
     );
     expect(href).toBe("/transactions");
+  });
+
+  it("dari Beranda (from=home) → kembali ke Beranda", () => {
+    const href = homeDetailHref(ID);
+    expect(href).toBe(`/transactions/${ID}?from=home`);
+    const params = new URL(href, "http://x").searchParams;
+    expect(detailBackHref(params, "2026-05", CURRENT)).toBe("/");
   });
 });

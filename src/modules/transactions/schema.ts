@@ -121,6 +121,36 @@ export function isTransactionField(field: string): field is TransactionField {
 }
 
 // ---------------------------------------------------------------------------
+// Ubah & hapus transaksi (E02-US04)
+// ---------------------------------------------------------------------------
+
+export const TRANSACTION_EDIT_MESSAGES = {
+  title: "Detail Transaksi",
+  submit: "Simpan perubahan",
+  updated: "Perubahan tersimpan",
+  deleted: "Transaksi dihapus",
+  updateError: "Gagal menyimpan perubahan. Coba lagi.",
+  deleteError: "Gagal menghapus transaksi. Coba lagi.",
+  /** Tidak ada / sudah dihapus / milik user lain (tanpa dibedakan, AC 11). */
+  notFound: "Transaksi tidak ditemukan",
+  deleteTitle: "Hapus transaksi ini?",
+  deleteWarning: "Tindakan ini tidak bisa dibatalkan.",
+  archived: "Diarsipkan",
+} as const;
+
+/** Id transaksi di input Server Action ubah/hapus. */
+export const transactionIdSchema = z.uuid();
+
+/** Input `updateTransactionAction`: id + field form (validasi = catat). */
+export const transactionUpdateSchema = transactionSchema.extend({
+  id: transactionIdSchema,
+});
+export type TransactionUpdateValues = z.input<typeof transactionUpdateSchema>;
+
+/** Input `deleteTransactionAction`. */
+export const transactionDeleteSchema = z.object({ id: transactionIdSchema });
+
+// ---------------------------------------------------------------------------
 // Daftar transaksi dengan filter (E02-US03)
 // ---------------------------------------------------------------------------
 
@@ -251,6 +281,13 @@ export function transactionListHref(
 
 /** Penanda detail dibuka dari daftar (`?from=list`), lihat `transactionDetailHref`. */
 export const FROM_LIST_PARAM = { name: "from", value: "list" } as const;
+/** Penanda detail dibuka dari Beranda (`?from=home`), lihat `homeDetailHref`. */
+export const FROM_HOME_VALUE = "home";
+
+/** Tautan detail dari transaksi terbaru di Beranda (E02-US04 AC 1). */
+export function homeDetailHref(id: string): string {
+  return `/transactions/${id}?${FROM_LIST_PARAM.name}=${FROM_HOME_VALUE}`;
+}
 
 /**
  * Tautan detail transaksi dari daftar: membawa penanda `from=list` + filter
@@ -268,17 +305,19 @@ export function transactionDetailHref(
 }
 
 /**
- * Tujuan tombol Kembali di detail: daftar dengan filter asal bila dibuka dari
- * daftar (`from=list`, filter divalidasi ulang — hanya path internal
- * `/transactions`), selain itu daftar bulan transaksi tsb (`fallbackMonth`).
+ * Tujuan tombol Kembali / tutup di detail: daftar dengan filter asal bila
+ * dibuka dari daftar (`from=list`, filter divalidasi ulang — hanya path
+ * internal `/transactions`), Beranda bila `from=home`, selain itu daftar bulan
+ * transaksi tsb (`fallbackMonth`).
  */
 export function detailBackHref(
   params: SearchParamsInput,
   fallbackMonth: string,
   currentMonth: string = currentMonthKey(),
 ): string {
-  const fromList =
-    getAllParams(params, FROM_LIST_PARAM.name)[0] === FROM_LIST_PARAM.value;
+  const from = getAllParams(params, FROM_LIST_PARAM.name)[0];
+  if (from === FROM_HOME_VALUE) return "/";
+  const fromList = from === FROM_LIST_PARAM.value;
   const filter = fromList
     ? parseTransactionListParams(params, currentMonth)
     : { month: fallbackMonth };
