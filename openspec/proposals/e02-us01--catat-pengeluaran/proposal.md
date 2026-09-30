@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-02---pencatatan-transaksi/e02-us01--catat-pengeluaran---story.md
-status: in-progress
+status: implemented
 branch: dev/e02-us01--catat-pengeluaran
 ---
 
@@ -72,6 +72,9 @@ Pencatatan pengeluaran adalah aksi paling sering di DompetKu dan sumber data unt
   field `categoryId` ("Kategori tidak valid. Pilih kategori lain.") — tidak membedakan "tidak ada" vs "milik orang lain".
 - **Refresh data setelah simpan:** `revalidatePath("/", "layout")` di Server Action; Beranda & Transaksi dinamis
   sehingga daftar & total ikut diperbarui dalam respons yang sama.
+- **Buka lagi cepat setelah Simpan:** form diberi `key` per sesi buka (selalu mulai kosong), overlay di `z-49`
+  (selalu di bawah konten), dan focus/pointerdown dari FAB sendiri tidak menutup dialog — mencegah race saat
+  "+" ditekan sebelum animasi tutup selesai.
 - **Beranda minimal:** kartu "Pengeluaran bulan ini" (`summary-expense-total`) dan 5 transaksi terbaru
   (`recent-transaction-item`) memakai selector E04-US01 agar bisa diperluas tanpa mengubah test.
 
