@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   create: vi.fn(),
   revalidatePath: vi.fn(),
+  getTransactionListPage: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -16,6 +17,9 @@ vi.mock("~/lib/prisma", () => ({
     category: { findFirst: mocks.findFirst },
     transaction: { create: mocks.create },
   },
+}));
+vi.mock("./queries", () => ({
+  getTransactionListPage: mocks.getTransactionListPage,
 }));
 vi.mock("~/lib/session", async () => {
   class UnauthorizedError extends Error {
@@ -27,7 +31,8 @@ vi.mock("~/lib/session", async () => {
   return { requireUser: mocks.requireUser, UnauthorizedError };
 });
 
-const { createTransactionAction } = await import("./actions");
+const { createTransactionAction, loadTransactionPageAction } =
+  await import("./actions");
 const { UnauthorizedError } = await import("~/lib/session");
 
 const USER_ID = "user-budi";
@@ -228,6 +233,73 @@ describe("createTransactionAction", () => {
     expect(result).toMatchObject({
       success: false,
       error: { code: "VALIDATION_ERROR" },
+    });
+  });
+});
+
+describe("loadTransactionPageAction (E02-US03 infinite scroll)", () => {
+  const request = {
+    filter: { month: "2026-09", type: null, categoryIds: [CATEGORY_ID] },
+    cursor: {
+      date: "2026-09-30",
+      createdAt: "2026-09-30T05:00:00.000Z",
+      id: TRANSACTION_ID,
+    },
+  };
+  const page = { items: [], dayTotals: {}, nextCursor: null };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-30T03:00:00Z"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.requireUser.mockResolvedValue({ id: USER_ID, name: "Budi" });
+    mocks.getTransactionListPage.mockResolvedValue(page);
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it("memuat halaman berikutnya untuk user session", async () => {
+    const result = await loadTransactionPageAction({
+      ...request,
+      userId: "user-lain",
+    });
+    expect(result).toEqual({ success: true, data: page });
+    expect(mocks.getTransactionListPage).toHaveBeenCalledWith(
+      USER_ID,
+      request.filter,
+      request.cursor,
+    );
+  });
+
+  it("belum login → UNAUTHORIZED tanpa query", async () => {
+    mocks.requireUser.mockRejectedValue(new UnauthorizedError());
+    const result = await loadTransactionPageAction(request);
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: "UNAUTHORIZED" },
+    });
+    expect(mocks.getTransactionListPage).not.toHaveBeenCalled();
+  });
+
+  it("input tidak valid → VALIDATION_ERROR", async () => {
+    const result = await loadTransactionPageAction({
+      ...request,
+      filter: { ...request.filter, categoryIds: ["bukan-uuid"] },
+    });
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: "VALIDATION_ERROR" },
+    });
+    expect(mocks.getTransactionListPage).not.toHaveBeenCalled();
+  });
+
+  it("kesalahan database → INTERNAL_ERROR 'Gagal memuat transaksi.'", async () => {
+    mocks.getTransactionListPage.mockRejectedValue(new Error("db down"));
+    const result = await loadTransactionPageAction(request);
+    expect(result).toEqual({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Gagal memuat transaksi." },
     });
   });
 });

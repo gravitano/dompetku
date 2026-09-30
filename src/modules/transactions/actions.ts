@@ -7,7 +7,14 @@ import { parseDateOnly } from "~/lib/date";
 import { prisma } from "~/lib/prisma";
 import { requireUser, UnauthorizedError } from "~/lib/session";
 
-import { TRANSACTION_MESSAGES, transactionSchema } from "./schema";
+import type { TransactionListPage } from "./list";
+import { getTransactionListPage } from "./queries";
+import {
+  TRANSACTION_LIST_MESSAGES,
+  TRANSACTION_MESSAGES,
+  transactionPageRequestSchema,
+  transactionSchema,
+} from "./schema";
 
 /**
  * Catat transaksi (E02-US01 pengeluaran; E02-US02 pemasukan memakai action
@@ -62,5 +69,36 @@ export async function createTransactionAction(
   } catch (error) {
     console.error("[createTransactionAction] gagal menyimpan", error);
     return fail("INTERNAL_ERROR", TRANSACTION_MESSAGES.systemError);
+  }
+}
+
+/**
+ * Halaman berikutnya daftar transaksi (E02-US03 infinite scroll, AC 9).
+ * Filter + cursor divalidasi Zod; `userId` dari session sehingga id kategori
+ * milik user lain tidak pernah mengembalikan data (AC 11).
+ */
+export async function loadTransactionPageAction(
+  input: unknown,
+): Promise<ActionResult<TransactionListPage>> {
+  let userId: string;
+  try {
+    userId = (await requireUser()).id;
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return fail("UNAUTHORIZED", error.message);
+    }
+    console.error("[loadTransactionPageAction] gagal membaca session", error);
+    return fail("INTERNAL_ERROR", TRANSACTION_LIST_MESSAGES.loadError);
+  }
+
+  const parsed = transactionPageRequestSchema.safeParse(input);
+  if (!parsed.success) return fromZodError(parsed.error);
+
+  try {
+    const { filter, cursor } = parsed.data;
+    return ok(await getTransactionListPage(userId, filter, cursor));
+  } catch (error) {
+    console.error("[loadTransactionPageAction] gagal memuat", error);
+    return fail("INTERNAL_ERROR", TRANSACTION_LIST_MESSAGES.loadError);
   }
 }
