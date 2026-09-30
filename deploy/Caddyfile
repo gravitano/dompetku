@@ -1,0 +1,40 @@
+# Caddy — reverse proxy + TLS otomatis (Let's Encrypt) untuk prod & staging (ITA §2).
+# Domain diambil dari env (tidak ditulis di repo):
+#   DOMAIN=dompetku.example.com STAGING_DOMAIN=staging.dompetku.example.com ACME_EMAIL=...
+# Caddy harus berada di network docker `web` yang sama dengan service app.
+
+{
+	email {$ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+}
+
+(static_cache) {
+	@static path /_next/static/*
+	header @static Cache-Control "public, max-age=31536000, immutable"
+}
+
+{$DOMAIN} {
+	import security_headers
+	import static_cache
+	encode zstd gzip
+	reverse_proxy dompetku-prod-app:3000
+}
+
+{$STAGING_DOMAIN} {
+	import security_headers
+	import static_cache
+	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow"
+	reverse_proxy dompetku-staging-app:3000
+}

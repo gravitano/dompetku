@@ -1,0 +1,79 @@
+# DompetKu — production. Compose project: dompetku-prod
+#   docker compose -p dompetku-prod -f deploy/docker-compose.production.yaml --env-file deploy/.env.production up -d
+# Secret (DATABASE_URL, BETTER_AUTH_SECRET, POSTGRES_PASSWORD, S3_*) hanya di
+# file .env.production di VPS — tidak pernah di repo.
+name: dompetku-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER wajib di-set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib di-set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB wajib di-set}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks: [internal]
+    # Tidak ada `ports`: database tidak diekspos ke publik (ITA §6.2).
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: ghcr.io/gravitano/dompetku-migrate:${IMAGE_TAG:-latest}
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+    restart: "no"
+    profiles: [migrate]
+
+  app:
+    image: ghcr.io/gravitano/dompetku:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      internal: {}
+      web:
+        aliases: [dompetku-prod-app]
+
+  # Backup harian 02:00 WIB → object storage S3 (ITA §4.1), retensi 14 hari.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      TZ: Asia/Jakarta
+      PGHOST: db
+      BACKUP_RETENTION_DAYS: 14
+    volumes:
+      - ./backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        apk add --no-cache aws-cli >/dev/null &&
+        echo '0 2 * * * /bin/sh /usr/local/bin/backup.sh >> /proc/1/fd/1 2>&1' | crontab - &&
+        crond -f -l 8
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+
+volumes:
+  db-data:
+
+networks:
+  internal: {}
+  # Network bersama dengan Caddy (dibuat sekali: `docker network create web`).
+  web:
+    external: true
