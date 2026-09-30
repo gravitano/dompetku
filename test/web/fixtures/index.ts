@@ -2,10 +2,11 @@ import { test as base } from "@playwright/test";
 
 import {
   TEST_ACCOUNTS,
+  TEST_PASSWORD,
   type TestAccount,
   type TestAccountKey,
 } from "./accounts";
-import { TestDb, uniqueEmail } from "./db";
+import { TestDb, uniqueEmail, type CreatedUser } from "./db";
 import { LoginPage } from "../pages/login-page";
 import { RegisterPage } from "../pages/register-page";
 
@@ -18,7 +19,15 @@ type Fixtures = {
    * bawaan better-auth (10/menit untuk `/sign-in/email`) tidak terpicu oleh
    * banyak test paralel dari mesin yang sama.
    */
-  loginAs: (account: TestAccountKey | TestAccount) => Promise<void>;
+  loginAs: (
+    account: TestAccountKey | TestAccount | CreatedUser,
+  ) => Promise<void>;
+  /**
+   * Buat akun baru terisolasi (kategori bawaan, tanpa transaksi), mis.
+   * `createUser("budi")` → `budi+<project>-<ts>-<rand>@example.com`.
+   * Aman untuk test paralel yang menghitung total/jumlah transaksi.
+   */
+  createUser: (prefix?: string, name?: string) => Promise<CreatedUser>;
 };
 
 type WorkerFixtures = {
@@ -47,6 +56,15 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   registerPage: async ({ page }, use) => {
     await use(new RegisterPage(page));
   },
+  createUser: async ({ db }, use, testInfo) => {
+    await use((prefix = "budi", name = "Budi Santoso") =>
+      db.createUser({
+        email: uniqueEmail(prefix, testInfo.project.name),
+        name,
+        password: TEST_PASSWORD,
+      }),
+    );
+  },
   loginAs: async ({ page }, use) => {
     await use(async (account) => {
       const { email, password } =
@@ -65,3 +83,4 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
 export { expect } from "@playwright/test";
 export { TEST_ACCOUNTS, TEST_PASSWORD } from "./accounts";
 export { uniqueEmail };
+export type { CreatedUser } from "./db";

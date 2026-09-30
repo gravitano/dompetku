@@ -23,3 +23,22 @@ export function getInitials(name: string): string {
       : [words[0].charAt(0), words[words.length - 1].charAt(0)];
   return letters.join("").toUpperCase();
 }
+
+/** Jumlah digit maksimum yang bisa diketik di input nominal. */
+export const AMOUNT_INPUT_MAX_DIGITS = 13;
+
+/**
+ * Ambil digit dari teks input nominal: "Rp 1.500.000" → "1500000".
+ * Nol di depan dibuang ("007" → "7", "0" tetap "0"), maksimal
+ * `AMOUNT_INPUT_MAX_DIGITS` digit. Kosong → "".
+ */
+export function parseAmountInput(text: string): string {
+  const digits = text.replace(/\D/g, "").slice(0, AMOUNT_INPUT_MAX_DIGITS);
+  if (digits === "") return "";
+  return digits.replace(/^0+(?=\d)/, "");
+}
+
+/** String digit → tampilan input nominal: "1500000" → "Rp 1.500.000", "" → "". */
+export function formatAmountInput(digits: string): string {
+  return digits === "" ? "" : formatRupiah(BigInt(digits));
+}
