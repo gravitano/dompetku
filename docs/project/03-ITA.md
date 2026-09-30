@@ -500,7 +500,7 @@ src/
 ├── components/
 │   ├── ui/               # shadcn/ui
 │   └── <module>/**       # Komponen per modul: layout, auth, transactions, categories, budgets, reports
-├── modules/<domain>/     # Logika server saja: actions.ts, queries.ts, schema.ts
+├── modules/<domain>/     # Logika server (actions.ts, queries.ts) + schema.ts (Zod, isomorfik: boleh di-import komponen client)
 └── lib/                  # auth, prisma client, format Rupiah, util tanggal
 prisma/                   # schema.prisma, migrations, seed
 test/web/                 # Playwright (struktur HAIE)
