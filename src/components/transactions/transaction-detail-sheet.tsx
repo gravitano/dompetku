@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { CategoryIcon } from "~/components/categories/category-icon";
@@ -57,7 +57,8 @@ type TransactionDetailSheetProps = {
  * Detail transaksi (E02-US04): form ubah terisi di *bottom sheet* (HP) /
  * dialog (desktop), tombol "Hapus transaksi" dengan konfirmasi, "Buang
  * perubahan?" saat menutup form yang sudah diubah. Setelah simpan/hapus:
- * toast lalu kembali ke daftar asal (data sudah di-revalidate server).
+ * toast lalu kembali ke daftar asal — modal: `router.back()` + refresh (tanpa
+ * menggandakan entri riwayat); tautan langsung: `router.replace(backHref)`.
  */
 export function TransactionDetailSheet({
   transaction,
@@ -83,6 +84,10 @@ export function TransactionDetailSheet({
   /** Sudah tersimpan/terhapus: abaikan permintaan tutup berikutnya. */
   const doneRef = useRef(false);
   const amountRef = useRef<HTMLInputElement | null>(null);
+  /** Modal: menunggu commit revalidate sebelum `router.back()`. */
+  const [leaving, setLeaving] = useState(false);
+  const leaveFromRef = useRef<TransactionListItem | null>(null);
+  const wentBackRef = useRef(false);
 
   const shown = frozen ?? transaction;
 
@@ -106,8 +111,39 @@ export function TransactionDetailSheet({
     setDeleteOpen(false);
     setOpen(false);
     toast.success(message, { duration: 3000 });
+    if (intercepted) {
+      // Modal di atas halaman asal: kembali ke entri riwayat halaman asal
+      // (tanpa menambah entri baru, sehingga Back berikutnya langsung
+      // berfungsi). Ditunda sampai hasil revalidate Server Action ter-commit
+      // (prop `transaction` berganti) — commit itu memperbarui riwayat dan
+      // akan membatalkan `history.back()` yang dipanggil lebih dulu.
+      leaveFromRef.current = transaction;
+      setLeaving(true);
+      return;
+    }
     router.replace(backHref);
   }
+
+  useEffect(() => {
+    if (!leaving) return;
+    const goBack = () => {
+      if (wentBackRef.current) return;
+      wentBackRef.current = true;
+      const refresh = () => {
+        window.removeEventListener("popstate", refresh);
+        router.refresh();
+      };
+      window.addEventListener("popstate", refresh);
+      router.back();
+    };
+    if (transaction !== leaveFromRef.current) {
+      goBack();
+      return;
+    }
+    // Pengaman bila revalidate tidak mengubah data route.
+    const timer = window.setTimeout(goBack, 1500);
+    return () => window.clearTimeout(timer);
+  }, [leaving, transaction, router]);
 
   function requestClose() {
     if (busyRef.current || doneRef.current) return;
