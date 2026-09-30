@@ -6,6 +6,7 @@
  * Butuh DB yang sudah di-seed (`pnpm db:seed`, akun budi@example.com).
  */
 import { expect, TEST_ACCOUNTS, test, uniqueEmail } from "../fixtures";
+import { TransactionFormPage } from "../pages/transaction-form";
 
 const PASSWORD = "rahasia123";
 
@@ -47,7 +48,31 @@ test.describe("Registrasi akun", () => {
       expect(summary!.transactionCount).toBe(0);
     });
 
-    test.fixme("kategori bawaan tampil di form Catat Pengeluaran", async () => {}); // diverifikasi lewat DB pada test di atas. // Form "Catat Pengeluaran" dibuat di EPIC-002; data kategori sudah
+    test("kategori bawaan tampil di form Catat Pengeluaran", async ({
+      page,
+      registerPage,
+    }, testInfo) => {
+      await registerPage.register({
+        name: "Citra Lestari",
+        email: uniqueEmail("citra", testInfo.project.name),
+        password: PASSWORD,
+      });
+      await expect(page).toHaveURL((url) => url.pathname === "/");
+
+      const form = new TransactionFormPage(page);
+      await form.open();
+      await expect(form.categoryOptions).toHaveText([
+        "Makan & Minum",
+        "Transportasi",
+        "Belanja",
+        "Tagihan",
+        "Hiburan",
+        "Kesehatan",
+        "Lainnya",
+      ]);
+      // Kategori pemasukan tidak tampil di mode Pengeluaran.
+      await expect(form.category("gaji")).toHaveCount(0);
+    });
 
     test("tautan Masuk ↔ Daftar antara halaman registrasi dan login", async ({
       page,
