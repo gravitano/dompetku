@@ -24,7 +24,7 @@ export const CATEGORY_MESSAGES = {
   lastActive: "Minimal harus ada 1 kategori aktif",
   limitReached: `Maksimal ${CATEGORY_ACTIVE_MAX} kategori aktif per jenis`,
   inUse:
-    "Kategori ini sudah dipakai transaksi, sehingga tidak bisa dihapus. Arsipkan saja.",
+    "Kategori ini sudah dipakai transaksi atau anggaran, sehingga tidak bisa dihapus. Arsipkan saja.",
   notFound: "Kategori tidak ditemukan",
   systemError: "Gagal menyimpan. Coba lagi.",
   created: "Kategori ditambahkan",

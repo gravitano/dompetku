@@ -9,10 +9,9 @@ import {
   type ActionFailure,
   type ActionResult,
 } from "~/lib/action-result";
-import { prisma } from "~/lib/prisma";
 import { requireUser, UnauthorizedError } from "~/lib/session";
-import type { Prisma } from "~/generated/prisma/client";
 
+import { withCategoryLock, type Tx } from "./lock";
 import {
   CATEGORY_ACTIVE_MAX,
   CATEGORY_MESSAGES as M,
@@ -23,7 +22,6 @@ import {
   normalizeCategoryName,
 } from "./schema";
 
-type Tx = Prisma.TransactionClient;
 type CategoryResult = ActionResult<{ id: string }>;
 
 /** `userId` dari session, atau `ActionResult` gagal (UNAUTHORIZED / INTERNAL). */
@@ -55,22 +53,6 @@ function readCategoryId(input: unknown): string | null {
       : undefined;
   const parsed = categoryIdSchema.safeParse(id);
   return parsed.success ? parsed.data : null;
-}
-
-/**
- * Jalankan mutasi kategori milik `userId` dalam satu transaksi DB yang
- * diawali advisory lock per user: mutasi kategori satu user (mis. dari dua
- * tab) diserialkan sehingga cek "nama unik" dan "minimal 1 aktif" tidak bisa
- * dilewati oleh race.
- */
-async function withCategoryLock<T>(
-  userId: string,
-  run: (tx: Tx) => Promise<T>,
-): Promise<T> {
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`categories:${userId}`}, 0))`;
-    return run(tx);
-  });
 }
 
 /** Nama sudah dipakai kategori lain (aktif maupun terarsip) di jenis yang sama. */
@@ -265,10 +247,11 @@ export async function restoreCategoryAction(
 }
 
 /**
- * Hapus permanen kategori yang belum pernah dipakai transaksi (AC 8). Yang
- * sudah dipakai → `CONFLICT` (arsipkan saja); kategori aktif terakhir juga
- * tidak boleh dihapus. FK `Restrict` transaksi → kategori tetap menjadi
- * pengaman terakhir bila transaksi dibuat bersamaan.
+ * Hapus permanen kategori yang belum pernah dipakai transaksi maupun anggaran
+ * (E02-US05 AC 8, E03-US01). Yang sudah dipakai → `CONFLICT` (arsipkan saja);
+ * kategori aktif terakhir juga tidak boleh dihapus. Anggaran dicek di dalam
+ * lock yang sama dengan action anggaran; FK `Restrict` transaksi/anggaran →
+ * kategori tetap menjadi pengaman terakhir bila data dibuat bersamaan.
  */
 export async function deleteCategoryAction(
   input: unknown,
@@ -285,7 +268,10 @@ export async function deleteCategoryAction(
     const result = await withCategoryLock(userId, async (tx) => {
       const current = await findOwned(tx, id, userId);
       if (!current) return notFound();
-      if ((await tx.transaction.count({ where: { categoryId: id } })) > 0) {
+      if (
+        (await tx.transaction.count({ where: { categoryId: id } })) > 0 ||
+        (await tx.budget.count({ where: { categoryId: id } })) > 0
+      ) {
         return fail("CONFLICT", M.inUse);
       }
       if (
