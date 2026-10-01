@@ -133,7 +133,7 @@ Feature: Atur anggaran kategori
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web), dijalankan di viewport HP (390×844) dan desktop (1280×800)
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `budget-month-prev`, `budget-month-next`, `budget-month-label` (UX-01)
   - `budget-total` (UX-02)
@@ -152,7 +152,7 @@ Feature: Atur anggaran kategori
 
 ## Test Data
 
-- Dua akun uji: `budi@example.com` dan `ani@example.com` (password dari fixture `test/web/fixtures/`), masing-masing dengan kategori bawaan
+- Dua akun uji: `budi@example.com` dan `ani@example.com` (password dari fixture `apps/test/web/fixtures/`), masing-masing dengan kategori bawaan
 - Seed anggaran `budi@example.com`: September 2026 (Makan & Minum Rp 1.200.000) dan Oktober 2026 (sesuai kebutuhan per skenario)
 - Satu kategori pengeluaran diarsipkan ("Hobi") dan satu kategori pemasukan ("Gaji") untuk skenario filter kategori
 

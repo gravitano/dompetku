@@ -122,7 +122,7 @@ Feature: Dashboard ringkasan bulanan
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web), dijalankan di viewport HP (390×844) dan desktop (1280×800)
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Tanggal sistem dibekukan ke 15 Okt 2026 (`page.clock.setFixedTime`) agar "bulan berjalan" deterministik
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `summary-income-total`, `summary-expense-total`, `summary-balance` (UX-01)

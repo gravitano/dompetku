@@ -119,7 +119,7 @@ Feature: Registrasi akun
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web), dijalankan di viewport HP (390×844) dan desktop (1280×800)
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `register-name-input` (UX-01)
   - `register-email-input` (UX-02)
@@ -138,7 +138,7 @@ Feature: Registrasi akun
 
 ## Test Data
 
-- Akun `budi@example.com` sudah terdaftar (fixture `test/web/fixtures/`) untuk skenario email duplikat
+- Akun `budi@example.com` sudah terdaftar (fixture `apps/test/web/fixtures/`) untuk skenario email duplikat
 - Email baru yang dibuat dinamis per test run untuk skenario registrasi berhasil
 
 ## Open QA Questions

@@ -127,7 +127,7 @@ Feature: Peringatan anggaran
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web). Logika perbandingan level sebelum/sesudah juga layak dites di level unit (Vitest) dengan tabel nilai batas.
-- Suggested priority: P2 (Should Have). Skenario `@smoke` masuk `test/web/smoke/` hanya jika FEAT-009 masuk rilis.
+- Suggested priority: P2 (Should Have). Skenario `@smoke` masuk `apps/test/web/smoke/` hanya jika FEAT-009 masuk rilis.
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `budget-alert-toast` dengan atribut `data-level="warning|over"` (UX-01)
   - `budget-alert-toast-link`, `budget-alert-toast-close` (UX-02)

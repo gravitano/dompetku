@@ -111,7 +111,7 @@ Feature: Catat pemasukan
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web), viewport HP (390×844) dan desktop (1280×800)
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `fab-add-transaction`
   - `transaction-type-toggle-expense` / `transaction-type-toggle-income` (UX-01, UX-05)

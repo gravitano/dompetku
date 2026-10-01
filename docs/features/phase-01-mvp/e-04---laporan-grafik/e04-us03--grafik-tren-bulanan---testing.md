@@ -99,7 +99,7 @@ Feature: Grafik tren bulanan
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web), dijalankan di viewport HP (390×844) dan desktop (1280×800)
-- Suggested priority: P2 (Should Have). Skenario `@smoke` masuk `test/web/smoke/` hanya jika fitur jadi dirilis di MVP
+- Suggested priority: P2 (Should Have). Skenario `@smoke` masuk `apps/test/web/smoke/` hanya jika fitur jadi dirilis di MVP
 - Tanggal sistem dibekukan ke 15 Okt 2026 (`page.clock.setFixedTime`)
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `trend-chart`, `trend-legend` (UX-01)
