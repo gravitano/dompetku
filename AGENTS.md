@@ -1,9 +1,8 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# DompetKu — monorepo
 
-# This is NOT the Next.js you know
+Monorepo **pnpm workspaces** (tanpa Turborepo). Jalankan semua perintah dari root (lihat `README.md`):
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->
+- `apps/web` — package `web`, app Next.js (Prisma, better-auth, Tailwind + shadcn, unit test Vitest). Baca juga `apps/web/AGENTS.md` sebelum mengubah kode Next.js.
+- `apps/test` — package `e2e`, Playwright E2E (struktur HAIE di `apps/test/web/`).
+- Env lokal: `apps/web/.env` (contoh: `apps/web/.env.example`).
+- Script root: `pnpm dev|build|start|lint|typecheck|format|test|test:e2e|db:*` → `pnpm --filter web …` / `pnpm --filter e2e …`.

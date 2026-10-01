@@ -1,0 +1,29 @@
+{
+  "name": "dompetku",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm -r lint && pnpm typecheck",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm --filter web test",
+    "test:e2e": "pnpm --filter e2e test",
+    "db:generate": "pnpm --filter web db:generate",
+    "db:migrate": "pnpm --filter web db:migrate",
+    "db:deploy": "pnpm --filter web db:deploy",
+    "db:seed": "pnpm --filter web db:seed",
+    "db:studio": "pnpm --filter web db:studio"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
