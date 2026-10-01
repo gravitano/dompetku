@@ -30,6 +30,8 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # Monorepo pnpm: semua perintah dijalankan dari root dan diteruskan ke
+      # package `web` (apps/web) / `e2e` (apps/test) lewat script root.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -37,7 +39,7 @@ jobs:
         run: pnpm db:generate
 
       - name: Lint
-        run: pnpm exec eslint .
+        run: pnpm -r lint
 
       - name: Typecheck
         run: pnpm typecheck
