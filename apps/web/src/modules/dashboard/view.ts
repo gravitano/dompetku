@@ -8,7 +8,6 @@ import {
 } from "~/modules/budgets/alerts";
 import type { MonthBudgetItem } from "~/modules/budgets/queries";
 import { budgetUsage, type BudgetUsage } from "~/modules/budgets/status";
-import { summarizeBudgets } from "~/modules/budgets/view";
 import type {
   MonthCategoryTotals,
   RecentTransaction,
@@ -82,7 +81,7 @@ export function buildDashboardView({
   recent: RecentTransaction[];
 }): DashboardView {
   const net = totals.income - totals.expense;
-  const budget = summarizeBudgets(budgets, totals.expense);
+  const totalBudget = budgets.reduce((sum, b) => sum + b.amount, ZERO);
   return {
     month: totals.month,
     income: totals.income,
@@ -90,9 +89,9 @@ export function buildDashboardView({
     net,
     netState: netState(net),
     budget:
-      budget.budgetCount > 0
-        ? budgetUsage(budget.totalSpent, budget.totalBudget)
-        : null,
+      // Total anggaran vs SELURUH pengeluaran bulan (termasuk kategori tanpa
+      // anggaran — keputusan PO, sama dengan E03-US02).
+      budgets.length > 0 ? budgetUsage(totals.expense, totalBudget) : null,
     attention: budgetAttention(
       budgets.map((b) => ({
         name: b.name,
