@@ -130,3 +130,114 @@ export class ReportsPage {
     return rows;
   }
 }
+
+const SHORT_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+
+/** "YYYY-MM" → nama bulan singkat sumbu X ("Okt"). */
+export function shortMonthLabel(month: string): string {
+  return SHORT_MONTHS[Number(month.slice(5, 7)) - 1];
+}
+
+/**
+ * Page Object seksi "Tren 6 bulan" di tab Laporan (E04-US03). Semua locator
+ * dibatasi ke root seksi (`reports-trend`) — tidak bentrok dengan grafik
+ * kategori (E04-US02) di atasnya.
+ */
+export class ReportsTrend {
+  readonly root: Locator;
+  readonly title: Locator;
+  readonly legend: Locator;
+  readonly chart: Locator;
+  readonly bars: Locator;
+  readonly xAxisLabels: Locator;
+  readonly tooltip: Locator;
+  readonly tooltipMonth: Locator;
+  readonly tooltipIncome: Locator;
+  readonly tooltipExpense: Locator;
+  readonly average: Locator;
+  readonly averageNote: Locator;
+  readonly insufficientData: Locator;
+  readonly tableToggle: Locator;
+  readonly tableRows: Locator;
+  readonly skeleton: Locator;
+  readonly loadError: Locator;
+  readonly retryButton: Locator;
+
+  constructor(readonly page: Page) {
+    this.root = page.getByTestId("reports-trend");
+    this.title = this.root.getByRole("heading", { level: 2 });
+    this.legend = this.root.getByTestId("trend-legend");
+    this.chart = this.root.getByTestId("trend-chart");
+    this.bars = this.chart.locator('[data-testid^="trend-bar-"]');
+    this.xAxisLabels = this.chart.locator(
+      ".recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value",
+    );
+    this.tooltip = this.root.getByTestId("trend-tooltip");
+    this.tooltipMonth = this.tooltip.getByTestId("trend-tooltip-month");
+    this.tooltipIncome = this.tooltip.getByTestId("trend-tooltip-income");
+    this.tooltipExpense = this.tooltip.getByTestId("trend-tooltip-expense");
+    this.average = this.root.getByTestId("trend-average-expense");
+    this.averageNote = this.root.getByTestId("trend-average-note");
+    this.insufficientData = this.root.getByTestId("trend-insufficient-data");
+    this.tableToggle = this.root.getByText("Lihat angka per bulan");
+    this.tableRows = this.root.getByTestId("trend-table-row");
+    this.skeleton = this.root.getByTestId("trend-skeleton");
+    this.loadError = this.root.getByTestId("trend-load-error");
+    this.retryButton = this.root.getByTestId("trend-retry-button");
+  }
+
+  bar(month: string): Locator {
+    return this.chart.getByTestId(`trend-bar-${month}`);
+  }
+
+  /**
+   * Kunci bulan ("YYYY-MM") semua batang, urut sumbu X. Menunggu 6 batang
+   * (grafik responsif baru digambar setelah lebar container terukur).
+   */
+  async barMonths(): Promise<string[]> {
+    await expect(this.bars).toHaveCount(6);
+    const ids = await this.bars.evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("data-testid") ?? ""),
+    );
+    return ids.map((id) => id.replace("trend-bar-", ""));
+  }
+
+  /**
+   * Tap (HP) atau hover (desktop) batang bulan `month` → highlight + tooltip.
+   * Diulang bila tap/hover terjadi sebelum hidrasi (event belum terpasang).
+   */
+  async focusMonth(month: string, isMobile: boolean) {
+    const bar = this.bar(month);
+    await this.chart.scrollIntoViewIfNeeded();
+    await expect(async () => {
+      const box = await bar.boundingBox();
+      if (!box) throw new Error(`Batang ${month} tidak terlihat`);
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height * 0.75;
+      if (isMobile) {
+        if ((await bar.getAttribute("data-active")) !== "true") {
+          await this.page.touchscreen.tap(x, y);
+        }
+      } else {
+        await this.page.mouse.move(0, 0);
+        await this.page.mouse.move(x, y);
+      }
+      await expect(bar).toHaveAttribute("data-active", "true", {
+        timeout: 1000,
+      });
+    }).toPass();
+  }
+}
