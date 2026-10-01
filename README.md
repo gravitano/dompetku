@@ -94,7 +94,7 @@ Repo terhubung ke Vercel lewat Git integration: push ke `main` = production, bra
 - **Build:** `apps/web/vercel.json` menjalankan `pnpm run vercel-build` = `prisma migrate deploy && next build`.
 - **Database:** Neon dari Vercel Marketplace — env `DATABASE_URL` (pooled, runtime) dan `DATABASE_URL_UNPOOLED` (migrasi) terisi otomatis.
 - **Env lain:** `BETTER_AUTH_SECRET` (wajib, `openssl rand -base64 32`). `BETTER_AUTH_URL` opsional — tanpa itu dipakai domain Vercel.
-- **Seed akun demo** (sekali): `DATABASE_URL_UNPOOLED=<url Neon> pnpm db:seed`.
+- **Seed akun demo** (sekali): `DATABASE_URL='<url Neon unpooled>' DATABASE_URL_UNPOOLED='<url Neon unpooled>' pnpm db:seed` (env shell menang atas `apps/web/.env`).
 
 > Lockout login & rate limit registrasi disimpan di memori proses. Di Vercel (serverless, banyak instance) batas itu tidak andal — cukup untuk demo, perlu storage bersama (DB/Redis) untuk production.
 
