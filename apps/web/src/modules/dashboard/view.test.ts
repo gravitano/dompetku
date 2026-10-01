@@ -17,11 +17,24 @@ function trx(id: string): RecentTransaction {
   };
 }
 
-const NO_BUDGET = {
-  totalBudget: BigInt(0),
-  totalSpent: BigInt(0),
-  budgetCount: 0,
-};
+function totals(
+  income: number,
+  expense: number,
+  byCategory: Record<string, number> = {},
+) {
+  return {
+    month: OKT,
+    income: BigInt(income),
+    expense: BigInt(expense),
+    expenseByCategory: new Map(
+      Object.entries(byCategory).map(([id, v]) => [id, BigInt(v)]),
+    ),
+  };
+}
+
+function budgetItem(categoryId: string, name: string, amount: number) {
+  return { categoryId, name, amount: BigInt(amount) };
+}
 
 describe("netState", () => {
   it("positif, negatif, nol", () => {
@@ -34,12 +47,8 @@ describe("netState", () => {
 describe("buildDashboardView", () => {
   it("selisih = pemasukan − pengeluaran (contoh testing.md)", () => {
     const view = buildDashboardView({
-      totals: {
-        month: OKT,
-        income: BigInt(8_000_000),
-        expense: BigInt(943_000),
-      },
-      budget: NO_BUDGET,
+      totals: totals(8_000_000, 943_000),
+      budgets: [],
       recent: [trx("a")],
     });
     expect(view.net).toBe(BigInt(7_057_000));
@@ -50,35 +59,33 @@ describe("buildDashboardView", () => {
 
   it("selisih negatif", () => {
     const view = buildDashboardView({
-      totals: {
-        month: OKT,
-        income: BigInt(1_000_000),
-        expense: BigInt(1_500_000),
-      },
-      budget: NO_BUDGET,
+      totals: totals(1_000_000, 1_500_000),
+      budgets: [],
       recent: [trx("a")],
     });
     expect(view.net).toBe(BigInt(-500_000));
     expect(view.netState).toBe("negative");
   });
 
-  it("belum ada anggaran → budget null (ajakan Atur anggaran)", () => {
+  it("belum ada anggaran → budget & attention null (ajakan Atur anggaran)", () => {
     const view = buildDashboardView({
-      totals: { month: OKT, income: BigInt(0), expense: BigInt(500) },
-      budget: { ...NO_BUDGET, totalSpent: BigInt(500) },
+      totals: totals(0, 500, { makan: 500 }),
+      budgets: [],
       recent: [trx("a")],
     });
     expect(view.budget).toBeNull();
+    expect(view.attention).toBeNull();
   });
 
-  it("ada anggaran → pemakaian total memakai aturan status E03-US02", () => {
+  it("ada anggaran → total anggaran vs SELURUH pengeluaran bulan (aturan E03-US02)", () => {
     const view = buildDashboardView({
-      totals: { month: OKT, income: BigInt(0), expense: BigInt(943_000) },
-      budget: {
-        totalBudget: BigInt(3_000_000),
-        totalSpent: BigInt(943_000),
-        budgetCount: 3,
-      },
+      // 43.000 dari kategori tanpa anggaran tetap dihitung.
+      totals: totals(0, 943_000, { makan: 900_000, hiburan: 43_000 }),
+      budgets: [
+        budgetItem("makan", "Makan & Minum", 1_500_000),
+        budgetItem("transport", "Transportasi", 1_000_000),
+        budgetItem("belanja", "Belanja", 500_000),
+      ],
       recent: [trx("a")],
     });
     expect(view.budget).toMatchObject({
@@ -88,26 +95,45 @@ describe("buildDashboardView", () => {
       status: "safe",
       remaining: BigInt(2_057_000),
     });
+    expect(view.attention).toBeNull();
   });
 
   it("tepat 100% → Terlampaui, bar penuh", () => {
     const view = buildDashboardView({
-      totals: { month: OKT, income: BigInt(0), expense: BigInt(100) },
-      budget: {
-        totalBudget: BigInt(100),
-        totalSpent: BigInt(100),
-        budgetCount: 1,
-      },
+      totals: totals(0, 100, { makan: 100 }),
+      budgets: [budgetItem("makan", "Makan & Minum", 100)],
       recent: [trx("a")],
     });
     expect(view.budget?.status).toBe("over");
     expect(view.budget?.barPercent).toBe(100);
   });
 
+  it("banner: kategori Hampir habis / Terlampaui dari pengeluaran per kategori (E03-US03)", () => {
+    const view = buildDashboardView({
+      totals: totals(0, 2_380_000, {
+        makan: 1_600_000,
+        transport: 500_000,
+        belanja: 100_000,
+        hiburan: 180_000,
+      }),
+      budgets: [
+        budgetItem("makan", "Makan & Minum", 1_500_000),
+        budgetItem("transport", "Transportasi", 600_000),
+        budgetItem("belanja", "Belanja", 1_000_000),
+        budgetItem("kosong", "Kesehatan", 200_000),
+      ],
+      recent: [trx("a")],
+    });
+    expect(view.attention).toEqual({
+      over: ["Makan & Minum"],
+      warning: ["Transportasi"],
+    });
+  });
+
   it("pengguna baru tanpa transaksi → empty state, ringkasan Rp 0", () => {
     const view = buildDashboardView({
-      totals: { month: OKT, income: BigInt(0), expense: BigInt(0) },
-      budget: NO_BUDGET,
+      totals: totals(0, 0),
+      budgets: [],
       recent: [],
     });
     expect(view.isNewUser).toBe(true);
@@ -117,8 +143,8 @@ describe("buildDashboardView", () => {
 
   it("maksimal 5 transaksi terbaru", () => {
     const view = buildDashboardView({
-      totals: { month: OKT, income: BigInt(0), expense: BigInt(0) },
-      budget: NO_BUDGET,
+      totals: totals(0, 0),
+      budgets: [],
       recent: ["a", "b", "c", "d", "e", "f"].map(trx),
     });
     expect(view.recent.map((t) => t.id)).toEqual(["a", "b", "c", "d", "e"]);

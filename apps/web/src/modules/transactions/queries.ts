@@ -63,23 +63,46 @@ export type MonthTotals = {
   expense: bigint;
 };
 
-/** Total pemasukan & pengeluaran bulan berjalan (zona Asia/Jakarta). */
+/** `MonthTotals` + pengeluaran per kategori (Beranda: status anggaran). */
+export type MonthCategoryTotals = MonthTotals & {
+  /** Total pengeluaran per `categoryId` bulan berjalan. */
+  expenseByCategory: Map<string, bigint>;
+};
+
+/**
+ * Total pemasukan & pengeluaran bulan berjalan (zona Asia/Jakarta) beserta
+ * pengeluaran per kategori — satu query `groupBy` sehingga Beranda tidak
+ * menghitung pengeluaran bulan dua kali (ringkasan + status anggaran).
+ */
 export async function getMonthTotals(
   userId: string,
   now: Date = new Date(),
-): Promise<MonthTotals> {
+): Promise<MonthCategoryTotals> {
   const month = currentMonthStart(now);
   const groups = await prisma.transaction.groupBy({
-    by: ["type"],
+    by: ["type", "categoryId"],
     where: {
       userId,
       transactionDate: { gte: month, lte: endOfMonth(month) },
     },
     _sum: { amount: true },
   });
-  const sumOf = (type: TransactionType) =>
-    groups.find((g) => g.type === type)?._sum.amount ?? BigInt(0);
-  return { month, income: sumOf("INCOME"), expense: sumOf("EXPENSE") };
+  let income = BigInt(0);
+  let expense = BigInt(0);
+  const expenseByCategory = new Map<string, bigint>();
+  for (const group of groups) {
+    const amount = group._sum.amount ?? BigInt(0);
+    if (group.type === "INCOME") {
+      income += amount;
+    } else {
+      expense += amount;
+      expenseByCategory.set(
+        group.categoryId,
+        (expenseByCategory.get(group.categoryId) ?? BigInt(0)) + amount,
+      );
+    }
+  }
+  return { month, income, expense, expenseByCategory };
 }
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   findTransaction: vi.fn(),
   updateMany: vi.fn(),
   deleteMany: vi.fn(),
+  budgetFindFirst: vi.fn(),
+  aggregate: vi.fn(),
+  $transaction: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -21,12 +24,15 @@ vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("~/lib/prisma", () => ({
   prisma: {
     category: { findFirst: mocks.findFirst },
+    budget: { findFirst: mocks.budgetFindFirst },
     transaction: {
       create: mocks.create,
       findFirst: mocks.findTransaction,
       updateMany: mocks.updateMany,
       deleteMany: mocks.deleteMany,
+      aggregate: mocks.aggregate,
     },
+    $transaction: mocks.$transaction,
   },
 }));
 vi.mock("./queries", () => ({
@@ -49,6 +55,16 @@ const {
   updateTransactionAction,
 } = await import("./actions");
 const { UnauthorizedError } = await import("~/lib/session");
+const { prisma } = await import("~/lib/prisma");
+
+/** `$transaction(fn)` menjalankan `fn` dengan client yang sama (mock). */
+function useInlineTransactions() {
+  mocks.$transaction.mockImplementation(
+    async (fn: (tx: typeof prisma) => unknown) => fn(prisma),
+  );
+  // Default: kategori tanpa anggaran → tanpa peringatan.
+  mocks.budgetFindFirst.mockResolvedValue(null);
+}
 
 const USER_ID = "user-budi";
 const CATEGORY_ID = "0b5a3c1e-8f2d-4b7a-9c6e-1d2f3a4b5c6d";
@@ -71,6 +87,7 @@ describe("createTransactionAction", () => {
     mocks.requireUser.mockResolvedValue({ id: USER_ID, name: "Budi" });
     mocks.findFirst.mockResolvedValue({ id: CATEGORY_ID });
     mocks.create.mockResolvedValue({ id: TRANSACTION_ID });
+    useInlineTransactions();
   });
 
   afterEach(() => vi.useRealTimers());
@@ -78,7 +95,10 @@ describe("createTransactionAction", () => {
   it("menyimpan pengeluaran milik user session (BigInt, DATE) lalu revalidate", async () => {
     const result = await createTransactionAction(valid);
 
-    expect(result).toEqual({ success: true, data: { id: TRANSACTION_ID } });
+    expect(result).toEqual({
+      success: true,
+      data: { id: TRANSACTION_ID, budgetAlert: null },
+    });
     expect(mocks.findFirst).toHaveBeenCalledWith({
       where: {
         id: CATEGORY_ID,
@@ -194,7 +214,10 @@ describe("createTransactionAction", () => {
       note: "Gaji September",
     });
 
-    expect(result).toEqual({ success: true, data: { id: TRANSACTION_ID } });
+    expect(result).toEqual({
+      success: true,
+      data: { id: TRANSACTION_ID, budgetAlert: null },
+    });
     expect(mocks.findFirst).toHaveBeenCalledWith({
       where: {
         id: CATEGORY_ID,
@@ -339,6 +362,7 @@ describe("updateTransactionAction (E02-US04)", () => {
     });
     mocks.findFirst.mockResolvedValue({ id: CATEGORY_ID });
     mocks.updateMany.mockResolvedValue({ count: 1 });
+    useInlineTransactions();
   });
 
   afterEach(() => vi.useRealTimers());
@@ -349,7 +373,10 @@ describe("updateTransactionAction (E02-US04)", () => {
       userId: "user-lain",
     });
 
-    expect(result).toEqual({ success: true, data: { id: TRANSACTION_ID } });
+    expect(result).toEqual({
+      success: true,
+      data: { id: TRANSACTION_ID, budgetAlert: null },
+    });
     expect(mocks.findTransaction).toHaveBeenCalledWith({
       where: { id: TRANSACTION_ID, userId: USER_ID },
       select: { categoryId: true, type: true },
@@ -488,6 +515,8 @@ describe("deleteTransactionAction (E02-US04)", () => {
       userId: "user-lain",
     });
     expect(result).toEqual({ success: true, data: { id: TRANSACTION_ID } });
+    expect(mocks.$transaction).not.toHaveBeenCalled();
+    expect(mocks.budgetFindFirst).not.toHaveBeenCalled();
     expect(mocks.deleteMany).toHaveBeenCalledWith({
       where: { id: TRANSACTION_ID, userId: USER_ID },
     });
@@ -524,6 +553,212 @@ describe("deleteTransactionAction (E02-US04)", () => {
     expect(await deleteTransactionAction({ id: TRANSACTION_ID })).toEqual({
       success: false,
       error: { code: "INTERNAL_ERROR", message: E.deleteError },
+    });
+  });
+});
+
+describe("peringatan anggaran saat simpan pengeluaran (E03-US03)", () => {
+  const BUDGET = 1_500_000;
+  const MAKAN = { amount: BigInt(BUDGET), category: { name: "Makan & Minum" } };
+  const OKT_START = new Date("2026-10-01T00:00:00Z");
+  const OKT_END = new Date("2026-10-31T00:00:00Z");
+  const today = { ...valid, transactionDate: "2026-10-15", note: "" };
+
+  /** Pengeluaran kategori sebelum lalu sesudah penulisan. */
+  function spent(before: number, after: number) {
+    mocks.aggregate
+      .mockResolvedValueOnce({ _sum: { amount: BigInt(before) } })
+      .mockResolvedValueOnce({ _sum: { amount: BigInt(after) } });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-15T03:00:00Z")); // 15 Okt 10:00 WIB
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.requireUser.mockResolvedValue({ id: USER_ID, name: "Budi" });
+    mocks.findFirst.mockResolvedValue({ id: CATEGORY_ID });
+    mocks.create.mockResolvedValue({ id: TRANSACTION_ID });
+    mocks.findTransaction.mockResolvedValue({
+      categoryId: CATEGORY_ID,
+      type: "EXPENSE",
+    });
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+    useInlineTransactions();
+    mocks.budgetFindFirst.mockResolvedValue(MAKAN);
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  async function create(amount: number, extra: Record<string, unknown> = {}) {
+    const result = await createTransactionAction({
+      ...today,
+      amount: String(amount),
+      ...extra,
+    });
+    if (!result.success) throw new Error(result.error.message);
+    return result.data.budgetAlert;
+  }
+
+  it("Aman → Hampir habis: peringatan kuning (85%, sisa Rp 225.000)", async () => {
+    spent(1_100_000, 1_275_000);
+    expect(await create(175_000)).toEqual({
+      categoryName: "Makan & Minum",
+      level: "warning",
+      percent: 85,
+      balanceLabel: "Sisa Rp 225.000",
+    });
+    // Sebelum & sesudah dihitung di transaksi DB yang sama, bulan berjalan saja.
+    expect(mocks.$transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.budgetFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: USER_ID,
+          categoryId: CATEGORY_ID,
+          periodMonth: OKT_START,
+        },
+      }),
+    );
+    expect(mocks.aggregate).toHaveBeenCalledWith({
+      where: {
+        userId: USER_ID,
+        categoryId: CATEGORY_ID,
+        type: "EXPENSE",
+        transactionDate: { gte: OKT_START, lte: OKT_END },
+      },
+      _sum: { amount: true },
+    });
+    const order = [
+      mocks.aggregate.mock.invocationCallOrder[0],
+      mocks.create.mock.invocationCallOrder[0],
+      mocks.aggregate.mock.invocationCallOrder[1],
+    ];
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("Hampir habis → Terlampaui: peringatan merah (lebih Rp 180.000)", async () => {
+    spent(1_300_000, 1_680_000);
+    expect(await create(380_000)).toEqual({
+      categoryName: "Makan & Minum",
+      level: "over",
+      percent: 112,
+      balanceLabel: "Lebih Rp 180.000",
+    });
+  });
+
+  it("Aman → Terlampaui langsung: hanya peringatan Terlampaui", async () => {
+    spent(500_000, 1_600_000);
+    expect(await create(1_100_000)).toMatchObject({
+      level: "over",
+      balanceLabel: "Lebih Rp 100.000",
+    });
+  });
+
+  it.each([
+    ["tetap Aman", 500_000, 600_000],
+    ["tetap Hampir habis", 1_250_000, 1_300_000],
+    ["sudah Terlampaui", 1_600_000, 1_650_000],
+  ])("status tidak naik level (%s) → tanpa peringatan", async (_, b, a) => {
+    spent(b, a);
+    expect(await create(a - b)).toBeNull();
+  });
+
+  it("pengeluaran bulan lain → tanpa cek anggaran & tanpa peringatan", async () => {
+    expect(await create(500_000, { transactionDate: "2026-09-30" })).toBeNull();
+    expect(mocks.budgetFindFirst).not.toHaveBeenCalled();
+    expect(mocks.aggregate).not.toHaveBeenCalled();
+    expect(mocks.create).toHaveBeenCalled();
+  });
+
+  it("bulan berjalan menurut Asia/Jakarta (1 Nov 00:30 WIB → transaksi Okt = bulan lalu)", async () => {
+    vi.setSystemTime(new Date("2026-10-31T17:30:00Z"));
+    expect(await create(500_000, { transactionDate: "2026-10-31" })).toBeNull();
+    expect(mocks.budgetFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("kategori tanpa anggaran → tanpa peringatan (pengeluaran tidak dihitung)", async () => {
+    mocks.budgetFindFirst.mockResolvedValue(null);
+    expect(await create(2_000_000)).toBeNull();
+    expect(mocks.aggregate).not.toHaveBeenCalled();
+  });
+
+  it("pemasukan tidak pernah memicu peringatan", async () => {
+    expect(await create(9_000_000, { type: "INCOME" })).toBeNull();
+    expect(mocks.budgetFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("ubah nominal sehingga naik level → peringatan (86%, sisa Rp 200.000)", async () => {
+    spent(1_100_000, 1_300_000);
+    const result = await updateTransactionAction({
+      ...today,
+      id: TRANSACTION_ID,
+      amount: "250000",
+    });
+    expect(result).toEqual({
+      success: true,
+      data: {
+        id: TRANSACTION_ID,
+        budgetAlert: {
+          categoryName: "Makan & Minum",
+          level: "warning",
+          percent: 86,
+          balanceLabel: "Sisa Rp 200.000",
+        },
+      },
+    });
+  });
+
+  it("ubah pindah kategori → kategori tujuan yang dievaluasi", async () => {
+    const TARGET = "7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f";
+    mocks.findFirst.mockResolvedValue({ id: TARGET });
+    mocks.budgetFindFirst.mockResolvedValue({
+      amount: BigInt(500_000),
+      category: { name: "Belanja" },
+    });
+    spent(100_000, 550_000);
+    const result = await updateTransactionAction({
+      ...today,
+      id: TRANSACTION_ID,
+      categoryId: TARGET,
+      amount: "450000",
+    });
+    expect(result).toMatchObject({
+      success: true,
+      data: { budgetAlert: { categoryName: "Belanja", level: "over" } },
+    });
+    expect(mocks.budgetFindFirst.mock.calls[0][0].where.categoryId).toBe(
+      TARGET,
+    );
+  });
+
+  it("ubah nominal turun → tanpa peringatan", async () => {
+    spent(1_300_000, 1_100_000);
+    const result = await updateTransactionAction({
+      ...today,
+      id: TRANSACTION_ID,
+      amount: "50000",
+    });
+    expect(result).toMatchObject({ data: { budgetAlert: null } });
+  });
+
+  it("ubah ke tanggal bulan lalu → tanpa peringatan", async () => {
+    const result = await updateTransactionAction({
+      ...today,
+      id: TRANSACTION_ID,
+      amount: "900000",
+      transactionDate: "2026-09-30",
+    });
+    expect(result).toMatchObject({ data: { budgetAlert: null } });
+    expect(mocks.budgetFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("gagal menyimpan → INTERNAL_ERROR, tanpa peringatan", async () => {
+    mocks.aggregate.mockResolvedValue({ _sum: { amount: BigInt(0) } });
+    mocks.create.mockRejectedValue(new Error("db down"));
+    const result = await createTransactionAction({ ...today, amount: "1" });
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: "INTERNAL_ERROR" },
     });
   });
 });

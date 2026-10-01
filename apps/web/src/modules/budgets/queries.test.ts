@@ -27,7 +27,8 @@ vi.mock("~/lib/prisma", () => ({
 
 const {
   getBudgetMonth,
-  getBudgetSummary,
+  getCategoryBudgetSpend,
+  getMonthBudgetList,
   getMonthBudgets,
   getMonthExpenseByCategory,
 } = await import("./queries");
@@ -155,24 +156,56 @@ describe("getMonthBudgets / getMonthExpenseByCategory", () => {
   });
 });
 
-describe("getBudgetSummary", () => {
-  it("total anggaran vs SELURUH pengeluaran bulan tsb (termasuk tanpa anggaran)", async () => {
-    mocks.budgetAggregate.mockResolvedValue({
-      _sum: { amount: BigInt(3_000_000) },
-      _count: { _all: 4 },
-    });
-    mocks.transactionAggregate.mockResolvedValue({
-      _sum: { amount: BigInt(1_250_000) },
-    });
+describe("getMonthBudgetList", () => {
+  it("anggaran bulan tsb + nama kategori, scope userId", async () => {
+    mocks.budgetFindMany.mockResolvedValue([
+      {
+        categoryId: "c1",
+        amount: BigInt(1_500_000),
+        category: { name: "Makan & Minum" },
+      },
+    ]);
+    expect(await getMonthBudgetList("user-budi", "2026-10")).toEqual([
+      { categoryId: "c1", amount: BigInt(1_500_000), name: "Makan & Minum" },
+    ]);
+    expect(mocks.budgetFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-budi", periodMonth: OKT },
+      }),
+    );
+  });
+});
 
-    expect(await getBudgetSummary("user-budi", "2026-10")).toEqual({
-      totalBudget: BigInt(3_000_000),
-      totalSpent: BigInt(1_250_000),
-      budgetCount: 4,
+describe("getCategoryBudgetSpend (E03-US03)", () => {
+  const db = {
+    budget: { findFirst: vi.fn() },
+    transaction: { aggregate: vi.fn() },
+  };
+
+  it("anggaran + pengeluaran kategori di bulan tsb, scope userId", async () => {
+    db.budget.findFirst.mockResolvedValue({
+      amount: BigInt(1_500_000),
+      category: { name: "Makan & Minum" },
     });
-    expect(mocks.transactionAggregate).toHaveBeenCalledWith({
+    db.transaction.aggregate.mockResolvedValue({
+      _sum: { amount: BigInt(1_100_000) },
+    });
+    expect(
+      await getCategoryBudgetSpend(db as never, "user-budi", "c1", OKT),
+    ).toEqual({
+      categoryName: "Makan & Minum",
+      budget: BigInt(1_500_000),
+      spent: BigInt(1_100_000),
+    });
+    expect(db.budget.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-budi", categoryId: "c1", periodMonth: OKT },
+      }),
+    );
+    expect(db.transaction.aggregate).toHaveBeenCalledWith({
       where: {
         userId: "user-budi",
+        categoryId: "c1",
         type: "EXPENSE",
         transactionDate: { gte: OKT, lte: new Date("2026-10-31T00:00:00Z") },
       },
@@ -180,16 +213,12 @@ describe("getBudgetSummary", () => {
     });
   });
 
-  it("belum ada anggaran & transaksi → nol", async () => {
-    mocks.budgetAggregate.mockResolvedValue({
-      _sum: { amount: null },
-      _count: { _all: 0 },
-    });
-    mocks.transactionAggregate.mockResolvedValue({ _sum: { amount: null } });
-    expect(await getBudgetSummary("user-baru", "2026-10")).toEqual({
-      totalBudget: BigInt(0),
-      totalSpent: BigInt(0),
-      budgetCount: 0,
-    });
+  it("kategori tanpa anggaran → null tanpa menghitung pengeluaran", async () => {
+    db.budget.findFirst.mockResolvedValue(null);
+    db.transaction.aggregate.mockClear();
+    expect(
+      await getCategoryBudgetSpend(db as never, "user-budi", "c1", OKT),
+    ).toBeNull();
+    expect(db.transaction.aggregate).not.toHaveBeenCalled();
   });
 });

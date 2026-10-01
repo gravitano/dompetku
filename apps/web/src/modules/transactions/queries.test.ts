@@ -34,8 +34,21 @@ describe("getMonthTotals", () => {
 
   it("memisahkan total pemasukan & pengeluaran (E02-US02 AC 5–6)", async () => {
     mocks.groupBy.mockResolvedValue([
-      { type: "EXPENSE", _sum: { amount: BigInt(25_000) } },
-      { type: "INCOME", _sum: { amount: BigInt(8_000_000) } },
+      {
+        type: "EXPENSE",
+        categoryId: "makan",
+        _sum: { amount: BigInt(25_000) },
+      },
+      {
+        type: "EXPENSE",
+        categoryId: "bensin",
+        _sum: { amount: BigInt(5_000) },
+      },
+      {
+        type: "INCOME",
+        categoryId: "gaji",
+        _sum: { amount: BigInt(8_000_000) },
+      },
     ]);
 
     const totals = await getMonthTotals("user-budi", NOW);
@@ -43,17 +56,27 @@ describe("getMonthTotals", () => {
     expect(totals).toEqual({
       month: new Date("2026-09-01T00:00:00Z"),
       income: BigInt(8_000_000),
-      expense: BigInt(25_000),
+      expense: BigInt(30_000),
+      // Pengeluaran per kategori dari query yang sama (status anggaran Beranda).
+      expenseByCategory: new Map([
+        ["makan", BigInt(25_000)],
+        ["bensin", BigInt(5_000)],
+      ]),
     });
   });
 
   it("hanya ada pemasukan → total pengeluaran tetap 0", async () => {
     mocks.groupBy.mockResolvedValue([
-      { type: "INCOME", _sum: { amount: BigInt(8_000_000) } },
+      {
+        type: "INCOME",
+        categoryId: "gaji",
+        _sum: { amount: BigInt(8_000_000) },
+      },
     ]);
 
     const totals = await getMonthTotals("user-budi", NOW);
 
+    expect(totals.expenseByCategory.size).toBe(0);
     expect(totals.income).toBe(BigInt(8_000_000));
     expect(totals.expense).toBe(BigInt(0));
   });
@@ -71,7 +94,7 @@ describe("getMonthTotals", () => {
     await getMonthTotals("user-budi", new Date("2026-09-30T18:00:00Z"));
 
     expect(mocks.groupBy).toHaveBeenCalledWith({
-      by: ["type"],
+      by: ["type", "categoryId"],
       where: {
         userId: "user-budi",
         transactionDate: {

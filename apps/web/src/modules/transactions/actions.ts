@@ -9,13 +9,19 @@ import {
   type ActionFailure,
   type ActionResult,
 } from "~/lib/action-result";
-import { parseDateOnly } from "~/lib/date";
+import { currentMonthStart, parseDateOnly, startOfMonth } from "~/lib/date";
 import { prisma } from "~/lib/prisma";
 import { requireUser, UnauthorizedError } from "~/lib/session";
+import { budgetAlertFor, type BudgetAlert } from "~/modules/budgets/alerts";
+import {
+  getCategoryBudgetSpend,
+  getCategorySpent,
+} from "~/modules/budgets/queries";
 
 import type { TransactionListPage } from "./list";
 import { getTransactionListPage } from "./queries";
 import {
+  type TransactionType,
   TRANSACTION_EDIT_MESSAGES,
   TRANSACTION_LIST_MESSAGES,
   TRANSACTION_MESSAGES,
@@ -56,6 +62,59 @@ function readTransactionId(input: unknown): string | null {
   return parsed.success ? parsed.data : null;
 }
 
+/** Hasil simpan transaksi (catat / ubah). */
+export type SavedTransaction = {
+  id: string;
+  /**
+   * Peringatan anggaran (E03-US03) bila penyimpanan membuat status anggaran
+   * kategori bulan berjalan naik level; `null` selain itu.
+   */
+  budgetAlert: BudgetAlert | null;
+};
+
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Jalankan `write` (catat/ubah) di satu transaksi DB sambil memantau anggaran
+ * kategori tujuan (E03-US03): hanya pengeluaran bertanggal bulan berjalan
+ * (Asia/Jakarta) dan kategori yang punya anggaran bulan itu. Total pengeluaran
+ * kategori dihitung sebelum & sesudah `write` di transaksi yang sama; status
+ * yang naik level menghasilkan `budgetAlert`. Hapus tidak memakai ini.
+ */
+async function saveWithBudgetAlert<T>(
+  userId: string,
+  target: { type: TransactionType; categoryId: string; transactionDate: Date },
+  write: (tx: Tx) => Promise<T>,
+): Promise<{ result: T; budgetAlert: BudgetAlert | null }> {
+  const month = startOfMonth(target.transactionDate);
+  const watched =
+    target.type === "EXPENSE" &&
+    month.getTime() === currentMonthStart().getTime();
+
+  return prisma.$transaction(async (tx) => {
+    const before = watched
+      ? await getCategoryBudgetSpend(tx, userId, target.categoryId, month)
+      : null;
+    const result = await write(tx);
+    if (!before) return { result, budgetAlert: null };
+    const spentAfter = await getCategorySpent(
+      tx,
+      userId,
+      target.categoryId,
+      month,
+    );
+    return {
+      result,
+      budgetAlert: budgetAlertFor({
+        categoryName: before.categoryName,
+        budget: before.budget,
+        spentBefore: before.spent,
+        spentAfter,
+      }),
+    };
+  });
+}
+
 /**
  * Catat transaksi (E02-US01 pengeluaran; E02-US02 pemasukan memakai action
  * yang sama). `userId` selalu dari session. Kategori wajib milik user, jenisnya
@@ -64,7 +123,7 @@ function readTransactionId(input: unknown): string | null {
  */
 export async function createTransactionAction(
   input: unknown,
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<SavedTransaction>> {
   let userId: string;
   try {
     userId = (await requireUser()).id;
@@ -91,21 +150,27 @@ export async function createTransactionAction(
       ]);
     }
 
-    const transaction = await prisma.transaction.create({
-      data: {
-        userId,
-        categoryId: category.id,
-        type,
-        amount: BigInt(amount),
-        transactionDate: parseDateOnly(transactionDate),
-        note,
-      },
-      select: { id: true },
-    });
+    const date = parseDateOnly(transactionDate);
+    const { result: transaction, budgetAlert } = await saveWithBudgetAlert(
+      userId,
+      { type, categoryId: category.id, transactionDate: date },
+      (tx) =>
+        tx.transaction.create({
+          data: {
+            userId,
+            categoryId: category.id,
+            type,
+            amount: BigInt(amount),
+            transactionDate: date,
+            note,
+          },
+          select: { id: true },
+        }),
+    );
 
     // Beranda & Transaksi dinamis: daftar dan total ikut diperbarui (AC 8).
     revalidatePath("/", "layout");
-    return ok({ id: transaction.id });
+    return ok({ id: transaction.id, budgetAlert });
   } catch (error) {
     console.error("[createTransactionAction] gagal menyimpan", error);
     return fail("INTERNAL_ERROR", TRANSACTION_MESSAGES.systemError);
@@ -153,7 +218,7 @@ export async function loadTransactionPageAction(
  */
 export async function updateTransactionAction(
   input: unknown,
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<SavedTransaction>> {
   const session = await sessionUserId(
     "updateTransactionAction",
     TRANSACTION_EDIT_MESSAGES.updateError,
@@ -191,21 +256,31 @@ export async function updateTransactionAction(
       ]);
     }
 
-    const { count } = await prisma.transaction.updateMany({
-      where: { id, userId },
-      data: {
-        categoryId: category.id,
-        type,
-        amount: BigInt(amount),
-        transactionDate: parseDateOnly(transactionDate),
-        note,
-      },
-    });
+    // Peringatan anggaran (E03-US03 AC 5): kategori/bulan/jenis hasil akhir
+    // yang dievaluasi — pindah kategori memeriksa kategori tujuan.
+    const date = parseDateOnly(transactionDate);
+    const { result: count, budgetAlert } = await saveWithBudgetAlert(
+      userId,
+      { type, categoryId: category.id, transactionDate: date },
+      async (tx) =>
+        (
+          await tx.transaction.updateMany({
+            where: { id, userId },
+            data: {
+              categoryId: category.id,
+              type,
+              amount: BigInt(amount),
+              transactionDate: date,
+              note,
+            },
+          })
+        ).count,
+    );
     if (count === 0) return notFound();
 
     // Daftar, ringkasan & Beranda ikut diperbarui (AC 5).
     revalidatePath("/", "layout");
-    return ok({ id });
+    return ok({ id, budgetAlert });
   } catch (error) {
     console.error("[updateTransactionAction] gagal menyimpan", error);
     return fail("INTERNAL_ERROR", TRANSACTION_EDIT_MESSAGES.updateError);

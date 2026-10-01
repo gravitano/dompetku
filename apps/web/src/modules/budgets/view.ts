@@ -51,7 +51,7 @@ export type BudgetMonthView = {
   total: bigint;
   /**
    * Seluruh pengeluaran bulan ini, termasuk kategori tanpa anggaran (keputusan
-   * PO — sama dengan `getBudgetSummary().totalSpent`).
+   * PO — sama dengan `BudgetSummary.totalSpent` Beranda).
    */
   totalSpent: bigint;
   /** Jumlah kategori yang punya anggaran bulan ini. */
@@ -154,4 +154,28 @@ export function sumSpent(spent: ReadonlyMap<string, bigint>): bigint {
 /** Jumlah nominal anggaran. */
 export function sumBudgets(budgets: readonly { amount: bigint }[]): bigint {
   return budgets.reduce((sum, b) => sum + b.amount, BigInt(0));
+}
+
+export type BudgetSummary = {
+  /** Jumlah semua anggaran bulan tsb. */
+  totalBudget: bigint;
+  /**
+   * Seluruh pengeluaran bulan tsb, TERMASUK kategori tanpa anggaran (keputusan
+   * PO; definisi sama untuk E03-US02 dan Beranda E04-US01).
+   */
+  totalSpent: bigint;
+  /** 0 → Beranda menampilkan ajakan "Atur anggaran bulan ini". */
+  budgetCount: number;
+};
+
+/** Ringkasan anggaran vs seluruh pengeluaran bulan (Beranda E04-US01). */
+export function summarizeBudgets(
+  budgets: readonly { amount: bigint }[],
+  totalSpent: bigint,
+): BudgetSummary {
+  return {
+    totalBudget: sumBudgets(budgets),
+    totalSpent,
+    budgetCount: budgets.length,
+  };
 }
