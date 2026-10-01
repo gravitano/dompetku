@@ -9,6 +9,7 @@ import {
   formatDateOnly,
   formatDayLabel,
   formatMonthKey,
+  formatMonthShort,
   formatMonthYear,
   parseDateOnly,
   parseMonthKey,
@@ -75,6 +76,12 @@ describe("format tampilan", () => {
     expect(formatDate(parseDateOnly("2026-09-30"))).toBe("30 Sep 2026");
     expect(formatDate(parseDateOnly("2026-08-05"))).toBe("5 Agu 2026");
     expect(formatDate(parseDateOnly("2026-12-01"))).toBe("1 Des 2026");
+  });
+
+  it('formatMonthShort → "Okt" / "Des" / "Jan"', () => {
+    expect(formatMonthShort(parseDateOnly("2026-10-01"))).toBe("Okt");
+    expect(formatMonthShort(parseDateOnly("2026-12-31"))).toBe("Des");
+    expect(formatMonthShort(parseDateOnly("2027-01-15"))).toBe("Jan");
   });
 
   it('formatMonthYear → "September 2026"', () => {

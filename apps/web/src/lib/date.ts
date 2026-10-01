@@ -90,6 +90,11 @@ export function formatDate(date: Date): string {
   return `${date.getUTCDate()} ${SHORT_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
+/** Date-only → "Okt" (nama bulan singkat, mis. sumbu grafik tren). */
+export function formatMonthShort(date: Date): string {
+  return SHORT_MONTHS[date.getUTCMonth()];
+}
+
 /** Date-only → "September 2026". */
 export function formatMonthYear(date: Date): string {
   return monthYearFormatter.format(date);
