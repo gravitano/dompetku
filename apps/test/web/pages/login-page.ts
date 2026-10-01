@@ -12,8 +12,12 @@ export class LoginPage {
   readonly alert: Locator;
   readonly emailError: Locator;
   readonly passwordError: Locator;
+  readonly demoInfo: Locator;
+  readonly demoFillButton: Locator;
 
   constructor(readonly page: Page) {
+    this.demoInfo = page.getByTestId("login-demo-info");
+    this.demoFillButton = page.getByTestId("login-demo-fill");
     this.title = page.getByTestId("login-title");
     this.form = page.getByTestId("login-form");
     this.emailInput = page.getByTestId("login-email-input");

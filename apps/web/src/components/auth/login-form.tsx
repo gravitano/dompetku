@@ -10,6 +10,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { loginAction } from "~/modules/auth/actions";
+import type { DemoCredentials } from "~/modules/auth/demo";
 import {
   LOGIN_MESSAGES,
   loginSchema,
@@ -19,6 +20,7 @@ import {
 } from "~/modules/auth/schema";
 
 import { AuthAlert, type AuthAlertVariant } from "./auth-alert";
+import { DemoAccountInfo } from "./demo-account-info";
 import { PasswordInput } from "./password-input";
 
 export type LoginNotice = "logout" | "registered";
@@ -28,6 +30,8 @@ type LoginFormProps = {
   callbackUrl: string;
   /** Banner awal dari query `?logout=1` / `?registered=1`. */
   notice?: LoginNotice | null;
+  /** Akun demo (hanya saat `DEMO_MODE=true`) — tampilkan kotak info + isi cepat. */
+  demoCredentials?: DemoCredentials | null;
 };
 
 type Alert = { variant: AuthAlertVariant; message: string };
@@ -56,7 +60,11 @@ function ErrorMessage({ id, error }: { id: string; error?: FieldError }) {
 }
 
 /** Form login (E01-US02, UX-01…UX-05). */
-export function LoginForm({ callbackUrl, notice }: LoginFormProps) {
+export function LoginForm({
+  callbackUrl,
+  notice,
+  demoCredentials,
+}: LoginFormProps) {
   const [pending, setPending] = useState(false);
   const [alert, setAlert] = useState<Alert | null>(
     notice ? NOTICES[notice] : null,
@@ -70,6 +78,7 @@ export function LoginForm({ callbackUrl, notice }: LoginFormProps) {
     setError,
     setValue,
     setFocus,
+    clearErrors,
     formState: { errors },
   } = useForm<LoginFormValues, unknown, LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -82,6 +91,14 @@ export function LoginForm({ callbackUrl, notice }: LoginFormProps) {
     setAlert({ variant: "error", message });
     // AC 5: email tetap, password dikosongkan.
     setValue("password", "");
+    setFocus("password");
+  }
+
+  /** Isi field dengan akun demo tanpa submit; user tetap menekan "Masuk". */
+  function fillDemo(credentials: DemoCredentials) {
+    setValue("email", credentials.email, { shouldDirty: true });
+    setValue("password", credentials.password, { shouldDirty: true });
+    clearErrors();
     setFocus("password");
   }
 
@@ -134,6 +151,13 @@ export function LoginForm({ callbackUrl, notice }: LoginFormProps) {
       aria-busy={pending}
     >
       <fieldset disabled={pending} className="flex flex-col gap-4">
+        {demoCredentials ? (
+          <DemoAccountInfo
+            credentials={demoCredentials}
+            onUse={() => fillDemo(demoCredentials)}
+          />
+        ) : null}
+
         {alert ? (
           <AuthAlert variant={alert.variant} message={alert.message} />
         ) : null}

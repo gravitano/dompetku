@@ -9,6 +9,7 @@ import {
   REGISTERED_PARAM,
   sanitizeCallbackUrl,
 } from "~/modules/auth/callback-url";
+import { getDemoCredentials } from "~/modules/auth/demo";
 
 export const metadata: Metadata = { title: "Masuk" };
 
@@ -41,7 +42,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         </h1>
         <p className="text-sm text-muted-foreground">Selamat datang kembali.</p>
       </div>
-      <LoginForm callbackUrl={callbackUrl} notice={notice} />
+      <LoginForm
+        callbackUrl={callbackUrl}
+        notice={notice}
+        demoCredentials={getDemoCredentials()}
+      />
     </div>
   );
 }
