@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-04---laporan-grafik/e04-us01--dashboard-ringkasan-bulanan---story.md
-status: draft
+status: implemented
 branch: dev/e04-us01--dashboard-ringkasan-bulanan
 ---
 
