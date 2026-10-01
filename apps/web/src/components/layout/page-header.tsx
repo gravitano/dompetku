@@ -4,9 +4,16 @@ type PageHeaderProps = {
   title: string;
   description?: string;
   actions?: ReactNode;
+  /** `data-testid` deskripsi (mis. judul periode Beranda). */
+  descriptionTestId?: string;
 };
 
-export function PageHeader({ title, description, actions }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  actions,
+  descriptionTestId,
+}: PageHeaderProps) {
   return (
     <div className="mb-4 flex items-start justify-between gap-4">
       <div>
@@ -14,7 +21,12 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
           {title}
         </h1>
         {description ? (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p
+            data-testid={descriptionTestId}
+            className="text-sm text-muted-foreground"
+          >
+            {description}
+          </p>
         ) : null}
       </div>
       {actions}

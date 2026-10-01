@@ -37,7 +37,11 @@ import type {
 
 import { BudgetFormSheet } from "./budget-form-sheet";
 import { BudgetProgress } from "./budget-progress";
-import { BUDGET_STATUS_CLASS, BudgetStatusIcon } from "./budget-status";
+import {
+  BUDGET_STATUS_CLASS,
+  budgetBalanceTone,
+  BudgetStatusIcon,
+} from "./budget-status";
 import { BudgetSummaryCard } from "./budget-summary-card";
 import { BudgetsSkeleton } from "./budgets-skeleton";
 
@@ -316,7 +320,10 @@ function RowName({ row }: { row: BudgetRow }) {
   return (
     <span
       data-testid="budget-row-name"
-      className={cn("truncate font-medium", row.archived && "opacity-60")}
+      className={cn(
+        "min-w-0 truncate font-medium",
+        row.archived && "opacity-60",
+      )}
     >
       {row.name}
     </span>
@@ -338,20 +345,23 @@ function ArchivedLabel({ row }: { row: BudgetRow }) {
 function BudgetedRowContent({ row }: { row: BudgetedRow }) {
   const { usage } = row;
   const tone = BUDGET_STATUS_CLASS[usage.status].text;
+  const balanceTone = budgetBalanceTone(usage.status);
   return (
     <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-      <span className="flex items-center gap-2">
-        <BudgetStatusIcon
-          status={usage.status}
-          testId={`budget-row-${row.slug}-status`}
-        />
+      <span className="flex min-w-0 items-center gap-2">
         <RowName row={row} />
         <ArchivedLabel row={row} />
-        <span
-          data-testid={`budget-row-${row.slug}-percent`}
-          className={cn("ml-auto shrink-0 font-semibold tabular-nums", tone)}
-        >
-          {usage.percent}%
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          <BudgetStatusIcon
+            status={usage.status}
+            testId={`budget-row-${row.slug}-status`}
+          />
+          <span
+            data-testid={`budget-row-${row.slug}-percent`}
+            className={cn("font-semibold tabular-nums", tone)}
+          >
+            {usage.percent}%
+          </span>
         </span>
       </span>
       <BudgetProgress
@@ -371,7 +381,8 @@ function BudgetedRowContent({ row }: { row: BudgetedRow }) {
         </span>
         <span
           data-testid={`budget-row-${row.slug}-remaining`}
-          className={cn(usage.overBy > BigInt(0) && cn("font-medium", tone))}
+          data-tone={balanceTone.tone}
+          className={balanceTone.className}
         >
           {budgetBalanceLabel(usage)}
         </span>
