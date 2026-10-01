@@ -11,7 +11,7 @@ Dokumen acuan: [`docs/project/03-ITA.md`](docs/project/03-ITA.md) (arsitektur, s
 DompetKu adalah aplikasi contoh untuk webinar **HAIE** (framework Spec-Driven Development GITS.ID) dan **FRIDAY** (workflow developer berbasis Claude Code). Seluruh isi repo, dari dokumen bisnis sampai kode dan test, dihasilkan lewat alur tersebut dengan AI sebagai pair.
 
 - **Live demo:** https://dompetku-sooty.vercel.app — halaman login menampilkan kotak info **Akun demo**; klik **Pakai akun demo** untuk mengisi email & password, lalu **Masuk** (akun publik, data contoh).
-- **Status:** Sprint 1 selesai (7 story: akun, catat/daftar/ubah/hapus transaksi, kelola kategori). Sprint 2 berjalan: E03-US01 atur anggaran kategori, E03-US02 indikator pemakaian anggaran, E03-US03 peringatan anggaran, E04-US01 dashboard ringkasan bulanan (Beranda), dan E04-US02 grafik pengeluaran per kategori (Laporan) selesai; story Anggaran & Laporan lainnya sudah punya spec, belum diimplementasikan.
+- **Status:** Sprint 1 & Sprint 2 selesai (13 story MVP).
 
 Akun demo — semua dibuat oleh `pnpm db:seed`, password `Password123`:
 

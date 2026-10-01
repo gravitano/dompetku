@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   categoryFindMany: vi.fn(),
   transactionGroupBy: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -10,11 +11,16 @@ vi.mock("~/lib/prisma", () => ({
   prisma: {
     category: { findMany: mocks.categoryFindMany },
     transaction: { groupBy: mocks.transactionGroupBy },
+    $queryRaw: mocks.queryRaw,
   },
 }));
 
-const { getExpenseCategoryReport, getMonthCategoryExpenses } =
-  await import("./queries");
+const {
+  getExpenseCategoryReport,
+  getMonthCategoryExpenses,
+  getMonthlyTotals,
+  getTrendReport,
+} = await import("./queries");
 
 const MAKAN = "11111111-1111-4111-8111-111111111111";
 const HIBURAN = "22222222-2222-4222-8222-222222222222";
@@ -100,5 +106,53 @@ describe("getExpenseCategoryReport", () => {
       href: `/transactions?category=${MAKAN}`,
     });
     expect(() => JSON.stringify(report)).not.toThrow();
+  });
+});
+
+describe("getMonthlyTotals", () => {
+  it("satu query agregasi ter-parameter, scope user session + rentang tanggal", async () => {
+    mocks.queryRaw.mockResolvedValue([
+      { month: "2026-09", type: "INCOME", amount: BigInt(8_000_000) },
+      { month: "2026-09", type: "EXPENSE", amount: BigInt(3_000_000) },
+    ]);
+
+    const result = await getMonthlyTotals("user-budi", "2026-08", "2027-01");
+
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
+    const [strings, ...values] = mocks.queryRaw.mock.calls[0];
+    const sql = (strings as string[]).join("?");
+    expect(sql).toMatch(/to_char\(transaction_date, 'YYYY-MM'\)/);
+    expect(sql).toMatch(/GROUP BY 1, 2/);
+    expect(sql).toMatch(/user_id = \?/);
+    // Nilai dikirim sebagai parameter (bukan disambung ke SQL).
+    expect(values).toEqual(["user-budi", "2026-08-01", "2027-01-31"]);
+    expect(result).toEqual([
+      { month: "2026-09", type: "INCOME", amount: BigInt(8_000_000) },
+      { month: "2026-09", type: "EXPENSE", amount: BigInt(3_000_000) },
+    ]);
+  });
+});
+
+describe("getTrendReport", () => {
+  it("6 bulan s.d. bulan berjalan, bulan kosong = 0", async () => {
+    mocks.queryRaw.mockResolvedValue([
+      { month: "2026-10", type: "EXPENSE", amount: BigInt(600_000) },
+    ]);
+
+    const report = await getTrendReport("user-baru", "2026-10");
+
+    const values = mocks.queryRaw.mock.calls[0].slice(1);
+    expect(values).toEqual(["user-baru", "2026-05-01", "2026-10-31"]);
+    expect(report.months.map((month) => month.month)).toEqual([
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+    ]);
+    expect(report.months[5].expense).toBe("600000");
+    expect(report.averageExpense).toBe("100000");
+    expect(report.insufficientData).toBe(true);
   });
 });
