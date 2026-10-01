@@ -51,7 +51,7 @@ export type BudgetMonthView = {
   total: bigint;
   /**
    * Seluruh pengeluaran bulan ini, termasuk kategori tanpa anggaran (keputusan
-   * PO — sama dengan `getBudgetSummary().totalSpent`).
+   * PO — definisi sama dengan ringkasan anggaran Beranda E04-US01).
    */
   totalSpent: bigint;
   /** Jumlah kategori yang punya anggaran bulan ini. */

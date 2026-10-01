@@ -4,7 +4,7 @@
  */
 import type { CategoryType } from "~/generated/prisma/enums";
 
-import { DEFAULT_CATEGORIES } from "./defaults";
+import { DEFAULT_CATEGORIES } from "./default-categories";
 
 export type CategoryOption = {
   id: string;

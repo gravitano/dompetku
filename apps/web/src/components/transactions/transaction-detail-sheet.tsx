@@ -11,6 +11,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { showBudgetAlertToast } from "~/components/budgets/budget-alert-toast";
 import { CategoryIcon } from "~/components/categories/category-icon";
 import { Button } from "~/components/ui/button";
 import {
@@ -22,6 +23,7 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { formatDate, parseDateOnly } from "~/lib/date";
+import type { BudgetAlert } from "~/modules/budgets/alerts";
 import type {
   CategoryOption,
   CategoryOptionsByType,
@@ -106,11 +108,13 @@ export function TransactionDetailSheet({
     else router.replace(backHref);
   }
 
-  function finish(message: string) {
+  function finish(message: string, budgetAlert: BudgetAlert | null = null) {
     doneRef.current = true;
     setDeleteOpen(false);
     setOpen(false);
     toast.success(message, { duration: 3000 });
+    // Peringatan anggaran setelah "Perubahan tersimpan" (E03-US03 AC 5).
+    showBudgetAlertToast(budgetAlert);
     if (intercepted) {
       // Modal di atas halaman asal: kembali ke entri riwayat halaman asal
       // (tanpa menambah entri baru, sehingga Back berikutnya langsung
@@ -208,7 +212,7 @@ export function TransactionDetailSheet({
               onCancel={requestClose}
               onDirtyChange={onDirtyChange}
               onPendingChange={onPendingChange}
-              onSaved={() => finish(M.updated)}
+              onSaved={(_, budgetAlert) => finish(M.updated, budgetAlert)}
               footer={
                 <Button
                   type="button"

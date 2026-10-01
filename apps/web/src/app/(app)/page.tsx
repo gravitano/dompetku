@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { HomeBudgetAlertBanner } from "~/components/budgets/budget-alert-banner";
 import { DashboardError } from "~/components/dashboard/dashboard-error";
 import { DashboardSkeleton } from "~/components/dashboard/dashboard-skeleton";
 import { DashboardView } from "~/components/dashboard/dashboard-view";
@@ -79,8 +80,17 @@ async function DashboardContent({
 }) {
   const loaded = await loadDashboard(userId, now, categories);
   if (!loaded) return <DashboardError />;
-  // Slot banner peringatan anggaran (AC 4a): E03-US03 mengisi prop `alerts`.
-  return <DashboardView data={loaded.data} categories={loaded.options} />;
+  const { attention } = loaded.data;
+  return (
+    <DashboardView
+      data={loaded.data}
+      categories={loaded.options}
+      // Banner peringatan anggaran (E03-US03 AC 8, slot E04-US01 AC 4a).
+      alerts={
+        attention ? <HomeBudgetAlertBanner attention={attention} /> : null
+      }
+    />
+  );
 }
 
 /** FAB "+" catat transaksi (AC 8); disembunyikan bila kategori gagal dimuat. */

@@ -4,6 +4,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { showBudgetAlertToast } from "~/components/budgets/budget-alert-toast";
 import type { CategoryOptionsByType } from "~/modules/categories/options";
 import { TRANSACTION_MESSAGES } from "~/modules/transactions/schema";
 
@@ -105,11 +106,13 @@ export function TransactionFormDialog({
             onCancel={requestClose}
             onDirtyChange={onDirtyChange}
             onPendingChange={onPendingChange}
-            onSaved={(type) => {
+            onSaved={(type, budgetAlert) => {
               close();
               toast.success(TRANSACTION_MESSAGES.saved[type], {
                 duration: 3000,
               });
+              // Peringatan anggaran tepat setelah toast sukses (E03-US03).
+              showBudgetAlertToast(budgetAlert);
             }}
           />
         </TransactionSheetContent>

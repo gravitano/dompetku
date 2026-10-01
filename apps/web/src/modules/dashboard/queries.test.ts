@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getMonthTotals: vi.fn(),
   getRecentTransactions: vi.fn(),
-  getBudgetSummary: vi.fn(),
+  getMonthBudgetList: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -12,7 +12,7 @@ vi.mock("~/modules/transactions/queries", () => ({
   getRecentTransactions: mocks.getRecentTransactions,
 }));
 vi.mock("~/modules/budgets/queries", () => ({
-  getBudgetSummary: mocks.getBudgetSummary,
+  getMonthBudgetList: mocks.getMonthBudgetList,
 }));
 
 const { getDashboardData } = await import("./queries");
@@ -26,13 +26,10 @@ beforeEach(() => {
     month: new Date("2027-01-01T00:00:00Z"),
     income: ZERO,
     expense: ZERO,
+    expenseByCategory: new Map(),
   });
   mocks.getRecentTransactions.mockResolvedValue([]);
-  mocks.getBudgetSummary.mockResolvedValue({
-    totalBudget: ZERO,
-    totalSpent: ZERO,
-    budgetCount: 0,
-  });
+  mocks.getMonthBudgetList.mockResolvedValue([]);
 });
 
 describe("getDashboardData", () => {
@@ -42,7 +39,7 @@ describe("getDashboardData", () => {
     await getDashboardData("user-1", now);
     expect(mocks.getMonthTotals).toHaveBeenCalledWith("user-1", now);
     expect(mocks.getRecentTransactions).toHaveBeenCalledWith("user-1", 5);
-    expect(mocks.getBudgetSummary).toHaveBeenCalledWith("user-1", "2027-01");
+    expect(mocks.getMonthBudgetList).toHaveBeenCalledWith("user-1", "2027-01");
   });
 
   it("query dijalankan paralel (tidak saling menunggu)", async () => {
@@ -50,12 +47,17 @@ describe("getDashboardData", () => {
     const gate = new Promise<void>((resolve) => (release = resolve));
     mocks.getMonthTotals.mockImplementation(async () => {
       await gate;
-      return { month: new Date(), income: ZERO, expense: ZERO };
+      return {
+        month: new Date(),
+        income: ZERO,
+        expense: ZERO,
+        expenseByCategory: new Map(),
+      };
     });
     const pending = getDashboardData("user-1");
     await Promise.resolve();
     expect(mocks.getRecentTransactions).toHaveBeenCalled();
-    expect(mocks.getBudgetSummary).toHaveBeenCalled();
+    expect(mocks.getMonthBudgetList).toHaveBeenCalled();
     release();
     await pending;
   });

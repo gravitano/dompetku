@@ -29,6 +29,7 @@ import {
   toJakartaDateString,
 } from "~/lib/date";
 import { cn } from "~/lib/utils";
+import type { BudgetAlert } from "~/modules/budgets/alerts";
 import type {
   CategoryOption,
   CategoryOptionsByType,
@@ -99,7 +100,11 @@ type TransactionFormProps = {
   footer?: ReactNode;
   /** Tombol ✕ / Batal di header (UX-07). */
   onCancel: () => void;
-  onSaved: (type: TransactionType) => void;
+  /**
+   * Tersimpan; `budgetAlert` = peringatan anggaran (E03-US03) bila status
+   * kategori naik level, ditampilkan setelah toast sukses.
+   */
+  onSaved: (type: TransactionType, budgetAlert: BudgetAlert | null) => void;
   onDirtyChange: (dirty: boolean) => void;
   onPendingChange: (pending: boolean) => void;
   /** Diisi agar dialog bisa memfokuskan Nominal saat terbuka (UX-06). */
@@ -281,7 +286,7 @@ export function TransactionForm({
     }
 
     if (result.success) {
-      onSaved(values.type);
+      onSaved(values.type, result.data.budgetAlert);
       return; // Dialog tertutup; tetap nonaktif sampai unmount.
     }
 
