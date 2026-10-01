@@ -668,6 +668,14 @@ describe("peringatan anggaran saat simpan pengeluaran (E03-US03)", () => {
     expect(mocks.budgetFindFirst).not.toHaveBeenCalled();
     expect(mocks.aggregate).not.toHaveBeenCalled();
     expect(mocks.create).toHaveBeenCalled();
+    // Tidak ada yang dipantau → tanpa transaksi interaktif.
+    expect(mocks.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("pengeluaran bulan berjalan → disimpan di transaksi interaktif", async () => {
+    spent(0, 100_000);
+    await create(100_000);
+    expect(mocks.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it("bulan berjalan menurut Asia/Jakarta (1 Nov 00:30 WIB → transaksi Okt = bulan lalu)", async () => {
@@ -685,6 +693,7 @@ describe("peringatan anggaran saat simpan pengeluaran (E03-US03)", () => {
   it("pemasukan tidak pernah memicu peringatan", async () => {
     expect(await create(9_000_000, { type: "INCOME" })).toBeNull();
     expect(mocks.budgetFindFirst).not.toHaveBeenCalled();
+    expect(mocks.$transaction).not.toHaveBeenCalled();
   });
 
   it("ubah nominal sehingga naik level → peringatan (86%, sisa Rp 200.000)", async () => {
