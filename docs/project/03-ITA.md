@@ -31,6 +31,7 @@ updated: 2026-09-30
 |---------|------|--------|---------|
 | 1.0 | 2026-09-30 | Warsono | Versi awal |
 | 1.1 | 2026-09-30 | Warsono | E01-US02: kode error `RATE_LIMITED`, penguncian login per email, `callbackUrl` di proxy |
+| 1.2 | 2026-10-01 | Warsono | E03-US01: kategori yang punya anggaran juga tidak bisa dihapus permanen; FK `BUDGET → CATEGORY` `ON DELETE RESTRICT` |
 
 ---
 
@@ -277,7 +278,7 @@ erDiagram
 Catatan desain:
 - `USER`, `SESSION`, `ACCOUNT` mengikuti skema bawaan better-auth.
 - Kategori bawaan di-*seed* per user saat registrasi (`is_default = true`), sehingga semua kategori punya `user_id` dan aturan isolasi datanya seragam.
-- Kategori yang sudah dipakai transaksi tidak dihapus permanen, tetapi diarsipkan (`archived_at`).
+- Kategori yang sudah dipakai transaksi atau anggaran tidak dihapus permanen, tetapi diarsipkan (`archived_at`). FK `TRANSACTION`/`BUDGET → CATEGORY` memakai `ON DELETE RESTRICT` sebagai pengaman terakhir.
 - `BUDGET` memiliki unique constraint `(user_id, category_id, period_month)`.
 - Index utama: `TRANSACTION (user_id, transaction_date)` dan `TRANSACTION (user_id, category_id, transaction_date)` untuk laporan bulanan.
 

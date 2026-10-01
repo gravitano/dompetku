@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-03---anggaran/e03-us01--atur-anggaran-kategori---story.md
-status: proposed
+status: implemented
 branch: dev/e03-us01--atur-anggaran-kategori
 ---
 
