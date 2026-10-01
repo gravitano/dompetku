@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-03---anggaran/e03-us03--peringatan-anggaran---story.md
-status: in-progress
+status: implemented
 branch: dev/e03-us03--peringatan-anggaran
 ---
 
@@ -50,6 +50,11 @@ spentBefore, spentAfter})` → `BudgetAlert | null` memakai `budgetStatus` / `bu
   query memberi total pemasukan/pengeluaran **dan** pengeluaran per kategori; `getBudgetSummary` (aggregate
   pengeluaran kedua) diganti `getMonthBudgetList` (anggaran + nama kategori). `getDashboardData` tetap satu
   `Promise.all` (3 query, tanpa N+1); ringkasan anggaran & status kategori dihitung murni di `dashboard/view.ts`.
+- **Client bundle:** `dashboard/view.ts` (diimpor komponen client) menghitung total anggaran sendiri, dan
+  `categories/options.ts` mengimpor data murni `default-categories` (bukan `defaults.ts` yang memuat Prisma).
+- **E2E:** locator ringkasan `BudgetsPage` di-scope ke `budgets-page` — Beranda memakai test id ringkasan yang sama
+  dan halaman sebelumnya bisa masih ada (tersembunyi) di DOM sesaat setelah navigasi client (flaky laten
+  `smoke/atur-anggaran` di `next start`, sudah ada di `development`).
 - Tanpa migration.
 
 ## Decisions (open questions)
