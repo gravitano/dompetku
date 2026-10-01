@@ -18,6 +18,7 @@ import { formatMonthYear, parseMonthKey, shiftMonthKey } from "~/lib/date";
 import { formatRupiah } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import { copyPreviousBudgetsAction } from "~/modules/budgets/actions";
+import { budgetAttention } from "~/modules/budgets/alerts";
 import {
   BUDGET_MESSAGES as M,
   BUDGET_MONTH_MIN,
@@ -35,6 +36,7 @@ import type {
   BudgetRow,
 } from "~/modules/budgets/view";
 
+import { BudgetPageAlertBanner } from "./budget-alert-banner";
 import { BudgetFormSheet } from "./budget-form-sheet";
 import { BudgetProgress } from "./budget-progress";
 import {
@@ -95,6 +97,17 @@ export function BudgetsView({ data, currentMonth }: BudgetsViewProps) {
   const empty = data.budgetCount === 0;
   const canCopy = editable && empty && data.copyableFromPrevious > 0;
   const { budgeted, unbudgeted, notSet } = data.sections;
+  // Banner peringatan hanya untuk bulan berjalan (E03-US03 AC 9, UX-04).
+  const attention =
+    data.month === currentMonth
+      ? budgetAttention(
+          budgeted.map((row) => ({
+            name: row.name,
+            spent: row.usage.spent,
+            budget: row.usage.budget,
+          })),
+        )
+      : null;
 
   function navigate(month: string) {
     startTransition(() => {
@@ -170,6 +183,8 @@ export function BudgetsView({ data, currentMonth }: BudgetsViewProps) {
           <BudgetsSkeleton rows={Math.max(data.rows.length, 3)} />
         ) : (
           <>
+            {attention ? <BudgetPageAlertBanner attention={attention} /> : null}
+
             <BudgetSummaryCard
               totalBudget={data.total}
               totalSpent={data.totalSpent}
