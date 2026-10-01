@@ -452,6 +452,8 @@ Staging dan production berjalan di **satu VPS** sebagai compose project terpisah
 
 > **Note:** Detail IP, domain, dan kredensial production tidak ditulis di repo.
 
+**Deployment demo (Vercel):** selain rencana VPS di atas, aplikasi di-deploy ke Vercel (Git integration, Root Directory `apps/web`, database Neon dari Vercel Marketplace) untuk keperluan demo. Migrasi dijalankan saat build (`vercel-build`). Lockout login dan rate limit registrasi masih in-memory, sehingga tidak andal di lingkungan serverless — perlu dipindah ke storage bersama sebelum dipakai sebagai production. Langkah setup: README bagian *Deploy*.
+
 ### 8.2 CI/CD Overview
 
 ```mermaid

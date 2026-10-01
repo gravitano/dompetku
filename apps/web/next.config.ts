@@ -6,8 +6,9 @@ import type { NextConfig } from "next";
 const workspaceRoot = path.join(__dirname, "../..");
 
 const nextConfig: NextConfig = {
-  // Output standalone untuk image Docker (lihat apps/web/Dockerfile).
-  output: "standalone",
+  // Output standalone untuk image Docker (lihat apps/web/Dockerfile);
+  // di Vercel dibiarkan default karena build Vercel mengemas sendiri.
+  output: process.env.VERCEL ? undefined : "standalone",
   // Tracing dari root workspace agar dependency pnpm (symlink ke
   // node_modules/.pnpm di root) ikut tersalin ke `.next/standalone`.
   outputFileTracingRoot: workspaceRoot,

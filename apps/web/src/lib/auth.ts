@@ -30,9 +30,29 @@ const SIGN_IN_EMAIL_PATH = "/sign-in/email";
  *   user + kategori bawaan dalam satu transaksi, sehingga endpoint HTTP
  *   `/sign-up/email` dinonaktifkan (`auth.api.*` di server tidak terpengaruh).
  */
+/** Host deployment Vercel (production, branch, dan URL unik per deploy). */
+const vercelOrigins = [
+  process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  process.env.VERCEL_BRANCH_URL,
+  process.env.VERCEL_URL,
+]
+  .filter((host): host is string => Boolean(host))
+  .map((host) => `https://${host}`);
+
+/**
+ * URL dasar auth: `BETTER_AUTH_URL` bila di-set; di Vercel tanpa env itu,
+ * pakai domain production (atau URL deploy preview).
+ */
+const baseURL =
+  process.env.BETTER_AUTH_URL ??
+  (process.env.VERCEL_ENV === "production"
+    ? vercelOrigins[0]
+    : vercelOrigins.at(-1));
+
 export const auth = betterAuth({
   appName: "DompetKu",
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL,
+  trustedOrigins: vercelOrigins,
   secret: process.env.BETTER_AUTH_SECRET,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   disabledPaths: ["/sign-up/email"],
