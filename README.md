@@ -86,4 +86,18 @@ Konvensi:
 
 ## Deploy
 
+### Vercel (demo)
+
+Repo terhubung ke Vercel lewat Git integration: push ke `main` = production, branch lain = preview.
+
+- **Root Directory:** `apps/web` (framework Next.js, pnpm workspace terdeteksi otomatis).
+- **Build:** `apps/web/vercel.json` menjalankan `pnpm run vercel-build` = `prisma migrate deploy && next build`.
+- **Database:** Neon dari Vercel Marketplace — env `DATABASE_URL` (pooled, runtime) dan `DATABASE_URL_UNPOOLED` (migrasi) terisi otomatis.
+- **Env lain:** `BETTER_AUTH_SECRET` (wajib, `openssl rand -base64 32`). `BETTER_AUTH_URL` opsional — tanpa itu dipakai domain Vercel.
+- **Seed akun demo** (sekali): `DATABASE_URL_UNPOOLED=<url Neon> pnpm db:seed`.
+
+> Lockout login & rate limit registrasi disimpan di memori proses. Di Vercel (serverless, banyak instance) batas itu tidak andal — cukup untuk demo, perlu storage bersama (DB/Redis) untuk production.
+
+### VPS + Docker (rencana ITA)
+
 Staging & production berjalan sebagai compose project terpisah di satu VPS (lihat `deploy/` dan ITA §8). Image dibangun dari root repo: `docker build -f apps/web/Dockerfile -t dompetku .` (target `migrate` untuk image migrasi). Secret disimpan di `deploy/.env.staging` / `deploy/.env.production` di VPS, tidak pernah di repo.
