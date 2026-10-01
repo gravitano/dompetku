@@ -329,6 +329,50 @@ test.describe("Kelola kategori", () => {
     });
   });
 
+  test.describe("@regression E03-US01 kategori dengan anggaran", () => {
+    test("kategori yang punya anggaran (tanpa transaksi) hanya bisa diarsipkan", async ({
+      db,
+    }) => {
+      await db.insertBudgets(user.id, [
+        { month: "2026-10", category: "Belanja", amount: 1_000_000 },
+        { month: "2026-11", category: "Belanja", amount: 1_000_000 },
+      ]);
+      await categories.goto();
+      await expect(
+        categories.activeRow("belanja").getByTestId("category-row-count"),
+      ).toHaveText("0 transaksi");
+      await categories.openCategory("belanja");
+
+      await expect(categories.deleteButton).toHaveCount(0);
+      await expect(categories.moreButton).toHaveCount(0);
+      await expect(categories.archiveHelp).toContainText(
+        "Kategori ini dipakai di 2 anggaran, sehingga tidak bisa dihapus",
+      );
+      await categories.archiveButton.click();
+
+      await expect(categories.toast(MESSAGES.archived)).toBeVisible();
+      expect(await categoryOf(db, user.id, "Belanja")).toMatchObject({
+        archived: true,
+      });
+      // Anggaran tetap ada (tidak ikut terhapus).
+      expect(
+        (await db.getBudgets(user.id)).filter((b) => b.category === "Belanja"),
+      ).toHaveLength(2);
+    });
+
+    test("teks bantuan menyebut transaksi dan anggaran", async ({ db }) => {
+      await db.insertBudgets(user.id, [
+        { month: "2026-09", category: "Makan & Minum", amount: 1_200_000 },
+      ]);
+      await categories.goto();
+      await categories.openCategory("makan-minum");
+      await expect(categories.deleteButton).toHaveCount(0);
+      await expect(categories.archiveHelp).toContainText(
+        "Kategori ini dipakai di 12 transaksi dan 1 anggaran",
+      );
+    });
+  });
+
   test.describe("@validation", () => {
     for (const { name, message } of [
       { name: "", message: MESSAGES.nameRequired },

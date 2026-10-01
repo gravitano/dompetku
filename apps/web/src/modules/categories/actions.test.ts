@@ -32,6 +32,7 @@ function matches(row: Record<string, unknown>, where: Where = {}): boolean {
 const store = vi.hoisted(() => ({
   categories: [] as Row[],
   transactions: [] as Array<{ id: string; userId: string; categoryId: string }>,
+  budgets: [] as Array<{ id: string; userId: string; categoryId: string }>,
   fail: false,
   seq: 0,
 }));
@@ -109,6 +110,10 @@ const tx = {
     count: async ({ where }: { where: Where }) =>
       store.transactions.filter((t) => matches(t, where)).length,
   },
+  budget: {
+    count: async ({ where }: { where: Where }) =>
+      store.budgets.filter((b) => matches(b, where)).length,
+  },
 };
 
 vi.mock("server-only", () => ({}));
@@ -165,6 +170,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   store.categories = [];
   store.transactions = [];
+  store.budgets = [];
   store.fail = false;
   mocks.requireUser.mockResolvedValue({ id: BUDI, name: "Budi" });
 
@@ -448,6 +454,39 @@ describe("deleteCategoryAction", () => {
       error: { code: "CONFLICT", message: M.inUse },
     });
     expect(store.categories).toContain(makan);
+  });
+
+  it("kategori yang punya anggaran (tanpa transaksi) tidak bisa dihapus (E03-US01)", async () => {
+    store.budgets.push({ id: "b1", userId: BUDI, categoryId: belanja.id });
+    const result = await deleteCategoryAction({ id: belanja.id });
+    expect(result).toEqual({
+      success: false,
+      error: { code: "CONFLICT", message: M.inUse },
+    });
+    expect(M.inUse).toBe(
+      "Kategori ini sudah dipakai transaksi atau anggaran, sehingga tidak bisa dihapus. Arsipkan saja.",
+    );
+    expect(store.categories).toContain(belanja);
+    expect(mocks.lock).toHaveBeenCalledOnce();
+    expectNoRevalidate();
+
+    // Anggaran pada kategori terarsip juga menahan hapus permanen.
+    const game = store.categories.find((c) => c.name === "Game")!;
+    store.budgets.push({ id: "b2", userId: BUDI, categoryId: game.id });
+    expect((await deleteCategoryAction({ id: game.id })).success).toBe(false);
+  });
+
+  it("FK Restrict (anggaran dibuat bersamaan) → CONFLICT inUse", async () => {
+    const original = tx.category.deleteMany;
+    tx.category.deleteMany = async () => {
+      throw Object.assign(new Error("fk"), { code: "P2003" });
+    };
+    try {
+      const result = await deleteCategoryAction({ id: belanja.id });
+      expect(result.success || result.error.message).toBe(M.inUse);
+    } finally {
+      tx.category.deleteMany = original;
+    }
   });
 
   it("kategori aktif terakhir per jenis tidak bisa dihapus", async () => {

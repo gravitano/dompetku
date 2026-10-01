@@ -75,6 +75,18 @@ function failureMessage(result: ActionResult<unknown>): string {
     : error.message;
 }
 
+/** "12 transaksi", "2 anggaran", atau "12 transaksi dan 2 anggaran". */
+function usageLabel(category: ManagedCategory): string {
+  return [
+    category.transactionCount > 0
+      ? `${category.transactionCount} transaksi`
+      : null,
+    category.budgetCount > 0 ? `${category.budgetCount} anggaran` : null,
+  ]
+    .filter(Boolean)
+    .join(" dan ");
+}
+
 /**
  * Form kategori (E02-US05): *bottom sheet* di HP, dialog di desktop. Tambah
  * (nama + ikon, jenis = tab aktif) atau ubah; mode ubah menampilkan "Hapus
@@ -116,7 +128,9 @@ export function CategoryFormSheet({
   const name = useWatch({ control, name: "name" }) ?? "";
   const icon = useWatch({ control, name: "icon" }) as string;
   const disabled = busy !== null;
-  const used = (category?.transactionCount ?? 0) > 0;
+  // Sudah dipakai transaksi atau anggaran (E03-US01) → hanya bisa diarsipkan.
+  const used =
+    (category?.transactionCount ?? 0) > 0 || (category?.budgetCount ?? 0) > 0;
 
   /** Jalankan satu aksi (guard klik ganda); `true` bila berhasil. */
   async function run(
@@ -451,9 +465,9 @@ export function CategoryFormSheet({
                     data-testid="category-archive-help"
                     className="text-center text-xs text-muted-foreground"
                   >
-                    Kategori ini dipakai di {category.transactionCount}{" "}
-                    transaksi, sehingga tidak bisa dihapus. Arsipkan untuk
-                    menyembunyikannya dari form.
+                    Kategori ini dipakai di {usageLabel(category)}, sehingga
+                    tidak bisa dihapus. Arsipkan untuk menyembunyikannya dari
+                    form.
                   </p>
                 </div>
               ) : null}
@@ -479,8 +493,8 @@ export function CategoryFormSheet({
                 Hapus kategori {category.name}?
               </DialogTitle>
               <DialogDescription>
-                Kategori ini belum pernah dipakai transaksi dan akan dihapus
-                permanen.
+                Kategori ini belum pernah dipakai transaksi maupun anggaran dan
+                akan dihapus permanen.
               </DialogDescription>
             </DialogHeader>
             {deleteError ? (

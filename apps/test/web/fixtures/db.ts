@@ -58,6 +58,17 @@ export type SeedTransaction = {
   createdAt?: Date;
 };
 
+/** Anggaran uji untuk di-insert langsung (tanpa UI). */
+export type SeedBudget = {
+  /** "YYYY-MM". */
+  month: string;
+  /** Nama kategori pengeluaran milik user. */
+  category: string;
+  amount: number;
+};
+
+export type StoredBudget = SeedBudget;
+
 export class TestDb {
   private readonly pool: Pool;
 
@@ -284,6 +295,56 @@ export class TestDb {
       transactionDate: row.transaction_date,
       note: row.note,
       categoryName: row.category_name,
+    }));
+  }
+
+  /**
+   * Insert anggaran langsung ke database. `month` "YYYY-MM"; kategori
+   * pengeluaran milik user berdasarkan nama (aktif maupun terarsip).
+   */
+  async insertBudgets(
+    userId: string,
+    rows: readonly SeedBudget[],
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    const { rowCount } = await this.pool.query(
+      `INSERT INTO budgets (id, user_id, category_id, period_month, amount, created_at, updated_at)
+       SELECT gen_random_uuid(), $1, c.id, (r.month || '-01')::date, r.amount, now(), now()
+       FROM unnest($2::text[], $3::text[], $4::bigint[]) AS r(category, month, amount)
+       JOIN categories c
+         ON c.user_id = $1 AND c.name = r.category AND c.type = 'EXPENSE'`,
+      [
+        userId,
+        rows.map((r) => r.category),
+        rows.map((r) => r.month),
+        rows.map((r) => String(r.amount)),
+      ],
+    );
+    if (rowCount !== rows.length) {
+      throw new Error(
+        `insertBudgets: ${rowCount}/${rows.length} baris (kategori tidak ditemukan?)`,
+      );
+    }
+  }
+
+  /** Anggaran user (urut bulan, nama kategori). */
+  async getBudgets(userId: string): Promise<StoredBudget[]> {
+    const { rows } = await this.pool.query<{
+      month: string;
+      category: string;
+      amount: string;
+    }>(
+      `SELECT to_char(b.period_month, 'YYYY-MM') AS month, c.name AS category,
+              b.amount::text AS amount
+       FROM budgets b JOIN categories c ON c.id = b.category_id
+       WHERE b.user_id = $1
+       ORDER BY b.period_month, c.name`,
+      [userId],
+    );
+    return rows.map((row) => ({
+      month: row.month,
+      category: row.category,
+      amount: Number(row.amount),
     }));
   }
 

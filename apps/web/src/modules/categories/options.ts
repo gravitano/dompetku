@@ -140,6 +140,11 @@ export type ManagedCategory = {
   /** Jumlah transaksi yang memakai kategori ini (semua waktu). */
   transactionCount: number;
   /**
+   * Jumlah anggaran (semua bulan) pada kategori ini (E03-US01). Kategori
+   * dengan transaksi atau anggaran dianggap "sudah dipakai": tidak bisa dihapus.
+   */
+  budgetCount: number;
+  /**
    * Kunci unik per jenis untuk `data-testid="category-row-<slug>"` /
    * `category-restore-button-<slug>`: slug nama, ditambah nomor urut bila
    * dua nama berbeda menghasilkan slug yang sama.

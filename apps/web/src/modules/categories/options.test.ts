@@ -119,6 +119,7 @@ describe("buildManagedCategories (E02-US05 halaman Kategori)", () => {
     isDefault: false,
     archivedAt: extra.archivedAt ?? null,
     transactionCount: extra.transactionCount ?? 0,
+    budgetCount: 0,
   });
 
   it("aktif lalu terarsip, masing-masing abjad; flag archived", () => {

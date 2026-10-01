@@ -47,8 +47,8 @@ export async function getFilterCategories(
 }
 
 /**
- * Semua kategori milik `userId` (aktif & terarsip) beserta jumlah transaksi
- * semua waktu — untuk halaman Kelola Kategori (E02-US05).
+ * Semua kategori milik `userId` (aktif & terarsip) beserta jumlah transaksi &
+ * anggaran semua waktu — untuk halaman Kelola Kategori (E02-US05).
  */
 export async function getManagedCategories(
   userId: string,
@@ -62,13 +62,14 @@ export async function getManagedCategories(
       icon: true,
       isDefault: true,
       archivedAt: true,
-      _count: { select: { transactions: true } },
+      _count: { select: { transactions: true, budgets: true } },
     },
   });
   return buildManagedCategories(
     categories.map(({ _count, ...c }) => ({
       ...c,
       transactionCount: _count.transactions,
+      budgetCount: _count.budgets,
     })),
   );
 }

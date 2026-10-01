@@ -142,7 +142,7 @@ model Budget {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@unique([userId, categoryId, periodMonth])
   @@index([userId, periodMonth])
