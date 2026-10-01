@@ -3,16 +3,15 @@
  * (mis. "akun tidak dibuat", jumlah kategori bawaan) dan untuk menyiapkan data
  * uji terisolasi (akun baru per test, kategori terarsip).
  *
- * Memakai `DATABASE_URL` dari environment (fallback `.env`) — database yang
- * sama dengan server yang diuji. Penulisan hanya ke data milik akun uji yang
- * dibuat helper ini (email unik per test).
+ * Memakai `DATABASE_URL` dari environment (fallback `apps/web/.env`, dimuat
+ * oleh `playwright.config.ts`) — database yang sama dengan server yang diuji.
+ * Penulisan hanya ke data milik akun uji yang dibuat helper ini (email unik
+ * per test).
  */
-import "dotenv/config";
-
 import { generateRandomString, hashPassword } from "better-auth/crypto";
 import { Pool } from "pg";
 
-import { DEFAULT_CATEGORIES } from "../../../src/modules/categories/defaults";
+import { DEFAULT_CATEGORIES } from "web/categories/defaults";
 
 export type UserSummary = {
   userId: string;
