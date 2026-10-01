@@ -1,5 +1,6 @@
 /**
- * Seed data lokal/staging: user demo + kategori bawaan + contoh transaksi.
+ * Seed data lokal/staging: user demo + kategori bawaan + contoh transaksi &
+ * anggaran.
  * Jalankan: `pnpm db:seed` (idempotent — aman dijalankan ulang).
  *
  * Password di-hash dengan `hashPassword` better-auth (scrypt) dan disimpan di
@@ -18,11 +19,31 @@ import { seedDefaultCategories } from "../src/modules/categories/defaults";
 const DEMO_PASSWORD = "Password123";
 
 const DEMO_USERS = [
-  { email: "budi@example.com", name: "Budi Santoso", withTransactions: true },
-  { email: "ani@example.com", name: "Ani Wijaya", withTransactions: true },
+  {
+    email: "budi@example.com",
+    name: "Budi Santoso",
+    withTransactions: true,
+    withBudgets: true,
+  },
+  {
+    email: "ani@example.com",
+    name: "Ani Wijaya",
+    withTransactions: true,
+    withBudgets: false,
+  },
   // Akun untuk skenario E2E (lihat test/web/fixtures/accounts.ts)
-  { email: "lock@example.com", name: "Akun Terkunci", withTransactions: false },
-  { email: "baru@example.com", name: "Pengguna Baru", withTransactions: false },
+  {
+    email: "lock@example.com",
+    name: "Akun Terkunci",
+    withTransactions: false,
+    withBudgets: false,
+  },
+  {
+    email: "baru@example.com",
+    name: "Pengguna Baru",
+    withTransactions: false,
+    withBudgets: false,
+  },
 ] as const;
 
 const prisma = new PrismaClient({
@@ -145,6 +166,47 @@ async function seedSampleTransactions(userId: string) {
   return result.count;
 }
 
+/**
+ * Contoh anggaran bulan lalu & bulan berjalan (E03-US01) — hanya jika user
+ * belum punya anggaran sama sekali. Bulan depan sengaja kosong agar tombol
+ * "Salin dari bulan lalu" bisa dicoba.
+ */
+async function seedSampleBudgets(userId: string) {
+  const count = await prisma.budget.count({ where: { userId } });
+  if (count > 0) return 0;
+
+  const categories = await prisma.category.findMany({
+    where: { userId, type: "EXPENSE", archivedAt: null },
+  });
+  const plan = [
+    { cat: "Makan & Minum", amount: 1_500_000 },
+    { cat: "Transportasi", amount: 600_000 },
+    { cat: "Belanja", amount: 1_000_000 },
+    { cat: "Tagihan", amount: 1_400_000 },
+  ];
+  const thisMonth = currentMonthStart();
+  const data = [addMonths(thisMonth, -1), thisMonth].flatMap((periodMonth) =>
+    plan.flatMap(({ cat, amount }) => {
+      const category = categories.find((c) => c.name === cat);
+      return category
+        ? [
+            {
+              userId,
+              categoryId: category.id,
+              periodMonth,
+              amount: BigInt(amount),
+            },
+          ]
+        : [];
+    }),
+  );
+  const result = await prisma.budget.createMany({
+    data,
+    skipDuplicates: true,
+  });
+  return result.count;
+}
+
 async function main() {
   for (const demo of DEMO_USERS) {
     const user = await upsertCredentialUser(demo.email, demo.name);
@@ -152,8 +214,9 @@ async function main() {
     const transactions = demo.withTransactions
       ? await seedSampleTransactions(user.id)
       : 0;
+    const budgets = demo.withBudgets ? await seedSampleBudgets(user.id) : 0;
     console.log(
-      `✔ ${demo.email}: +${categories} kategori, +${transactions} transaksi`,
+      `✔ ${demo.email}: +${categories} kategori, +${transactions} transaksi, +${budgets} anggaran`,
     );
   }
   console.log(`Seed selesai. Password semua akun demo: ${DEMO_PASSWORD}`);
