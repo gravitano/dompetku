@@ -116,7 +116,7 @@ Feature: Grafik pengeluaran per kategori
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web), dijalankan di viewport HP (390×844) dan desktop (1280×800)
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Tanggal sistem dibekukan ke 15 Okt 2026 (`page.clock.setFixedTime`)
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `report-month-prev`, `report-month-next`, `report-month-label` (UX-01)

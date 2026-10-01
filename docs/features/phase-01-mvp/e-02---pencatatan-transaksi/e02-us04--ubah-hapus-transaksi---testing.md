@@ -141,7 +141,7 @@ Feature: Ubah dan hapus transaksi
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web) untuk UI; skenario request langsung diuji di level integration test (Vitest memanggil Server Action dengan session user lain)
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `transaction-row-<id>`
   - `transaction-amount-input`, `transaction-date-picker`, `transaction-note-input` (UX-01)

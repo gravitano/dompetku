@@ -1,8 +1,8 @@
 pnpm-lock.yaml
 .next
 node_modules
-src/generated
-prisma/migrations
+apps/web/src/generated
+apps/web/prisma/migrations
 playwright-report
 test-results
 docs

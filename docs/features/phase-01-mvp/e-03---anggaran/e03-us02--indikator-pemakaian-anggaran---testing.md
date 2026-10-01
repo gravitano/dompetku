@@ -125,7 +125,7 @@ Feature: Indikator pemakaian anggaran
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web) untuk tampilan. Perhitungan persentase dan ambang warna juga layak dites di level unit (Vitest), terutama nilai batas 79,99% / 80% / 100%.
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `budget-summary-card`, `budget-summary-percent`, `budget-summary-remaining` (UX-01)
   - `budget-row-<category-slug>`, `budget-row-<category-slug>-percent`, `budget-row-<category-slug>-remaining` (UX-02)

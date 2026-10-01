@@ -3,31 +3,31 @@
 .claude/skills/pm-*
 .claude/skills/qa-*
 .claude/rules/haie.md
-playwright-report/
-test-results/
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 
 # testing
-/coverage
-/blob-report/
-/playwright/.cache/
-/test/web/.auth/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+/apps/test/web/.auth/
 
 # next.js
-/.next/
-/out/
+.next/
+/apps/*/out/
 next-env.d.ts
 *.tsbuildinfo
 
 # production
-/build
+/apps/*/build/
 
 # prisma generated client
-/src/generated/
+/apps/web/src/generated/
 
 # misc
 .DS_Store
@@ -35,7 +35,7 @@ next-env.d.ts
 npm-debug.log*
 .pnpm-debug.log*
 
-# env files
+# env files (mis. apps/web/.env)
 .env
 .env*.local
 .env.*

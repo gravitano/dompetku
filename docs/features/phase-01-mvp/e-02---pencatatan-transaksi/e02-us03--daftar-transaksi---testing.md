@@ -140,7 +140,7 @@ Feature: Daftar transaksi dengan filter
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web), viewport HP (390×844) dan desktop (1280×800)
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `month-prev-button` (UX-01), `month-next-button` (UX-02), `month-label`
   - `filter-button` (UX-03), `filter-type-<all|expense|income>` (UX-07), `filter-category-<slug>`, `filter-apply-button`, `filter-reset-button`

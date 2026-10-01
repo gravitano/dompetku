@@ -7,21 +7,12 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   prettier,
-  {
-    // Fixture Playwright memakai parameter `use`, bukan React hook.
-    files: ["test/**/*.ts"],
-    rules: { "react-hooks/rules-of-hooks": "off" },
-  },
   globalIgnores([
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
     "src/generated/**",
-    "playwright-report/**",
-    "test-results/**",
-    ".haie/**",
-    ".claude/**",
   ]),
 ]);
 

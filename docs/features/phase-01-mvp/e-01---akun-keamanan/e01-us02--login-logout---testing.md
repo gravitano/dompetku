@@ -132,7 +132,7 @@ Feature: Login & logout
 ## QA Automation Notes
 
 - Suggested test type: Playwright (web), dijalankan di viewport HP (390×844) dan desktop (1280×800)
-- Suggested priority: P1. Skenario `@smoke` masuk `test/web/smoke/`
+- Suggested priority: P1. Skenario `@smoke` masuk `apps/test/web/smoke/`
 - Key selectors or interaction targets (gunakan `data-testid`):
   - `login-email-input` (UX-01)
   - `login-password-input`, `login-password-toggle` (UX-02)
@@ -152,7 +152,7 @@ Feature: Login & logout
 
 ## Test Data
 
-- Akun `budi@example.com` (nama "Budi Santoso") dan `ani@example.com`, password dari fixture `test/web/fixtures/`
+- Akun `budi@example.com` (nama "Budi Santoso") dan `ani@example.com`, password dari fixture `apps/test/web/fixtures/`
 - Akun khusus `lock@example.com` untuk skenario rate limit
 
 ## Open QA Questions
