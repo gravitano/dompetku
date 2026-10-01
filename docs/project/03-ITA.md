@@ -191,11 +191,11 @@ C4Component
 
 | Tool | Purpose |
 |------|---------|
-| pnpm | Package manager |
+| pnpm (workspaces) | Package manager; monorepo `apps/web` (package `web`) + `apps/test` (package `e2e`), tanpa Turborepo |
 | Docker & Docker Compose | PostgreSQL lokal, staging, dan production |
 | ESLint + Prettier | Linting & formatting |
 | Vitest | Unit test |
-| Playwright | E2E test (`test/web/`) |
+| Playwright | E2E test (`apps/test/web/`) |
 | GitHub Actions | CI/CD |
 | Git + GitHub | Version control & container registry (GHCR) |
 
@@ -303,8 +303,8 @@ MVP tidak mengekspos public REST API. UI berkomunikasi dengan server melalui **S
 
 | Aspect | Standard |
 |--------|----------|
-| Mutasi data | Server Actions per domain (`src/modules/<domain>/actions.ts`), input divalidasi Zod |
-| Baca data | Server Components memanggil query function di `src/modules/<domain>/queries.ts` |
+| Mutasi data | Server Actions per domain (`apps/web/src/modules/<domain>/actions.ts`), input divalidasi Zod |
+| Baca data | Server Components memanggil query function di `apps/web/src/modules/<domain>/queries.ts` |
 | Route Handlers | `/api/auth/*` (better-auth), `/api/health` (health check untuk deploy & uptime monitor) |
 | Authentication | Session cookie better-auth (`HttpOnly`, `Secure`, `SameSite=Lax`) |
 | Otorisasi | Setiap action/query mengambil `userId` dari session di server, bukan dari input client |
@@ -359,7 +359,7 @@ Kode error standar: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`,
 | Password Hashing | Algoritma bawaan better-auth (scrypt); minimal 8 karakter |
 | Rate limiting | Rate limiter bawaan better-auth (per IP) untuk endpoint HTTP auth; limiter per IP di Server Action login/registrasi (production); penguncian login per email 5x gagal / 15 menit (hook sign-in better-auth) |
 | Authorization | Owner-based: setiap record punya `user_id`, dan semua query difilter berdasarkan `userId` dari session |
-| Route protection | Proxy Next.js (`src/proxy.ts`) mengarahkan user tanpa session ke `/login?callbackUrl=<path internal>`; pengecekan session tetap diulang di setiap layout/action/query (defense in depth) |
+| Route protection | Proxy Next.js (`apps/web/src/proxy.ts`) mengarahkan user tanpa session ke `/login?callbackUrl=<path internal>`; pengecekan session tetap diulang di setiap layout/action/query (defense in depth) |
 
 ### 6.2 Security Measures
 
@@ -394,8 +394,8 @@ Tidak ada peran admin di aplikasi pada MVP. Administrasi server dilakukan langsu
 # 1. Clone & setup
 git clone <repository-url>
 cd dompetku
-cp .env.example .env
-pnpm install
+cp apps/web/.env.example apps/web/.env
+pnpm install            # dari root (pnpm workspaces)
 
 # 2. Start database & app
 docker compose up -d db
@@ -411,18 +411,21 @@ pnpm dev
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev` | Jalankan Next.js dev server |
+| `pnpm dev` | Jalankan Next.js dev server (port 3000, env `apps/web/.env`) |
 | `pnpm build` / `pnpm start` | Build & jalankan mode production |
-| `pnpm lint` | ESLint + typecheck |
-| `pnpm test` | Unit test (Vitest) |
-| `pnpm test:e2e` | E2E test (Playwright) |
+| `pnpm lint` | ESLint semua package + typecheck |
+| `pnpm format` / `pnpm format:check` | Prettier seluruh repo |
+| `pnpm test` | Unit test (Vitest, `apps/web`) |
+| `pnpm test:e2e` | E2E test (Playwright, `apps/test`; menyalakan app di port 3100) |
 | `pnpm db:migrate` | `prisma migrate dev` |
 | `pnpm db:seed` | Isi data contoh (user demo + transaksi) |
 | `docker compose up -d db` | Jalankan PostgreSQL lokal |
 
+Semua perintah dijalankan dari root repo; script root meneruskan ke package terkait (`pnpm --filter web …` / `pnpm --filter e2e …`).
+
 ### 7.3 Environment Variables
 
-See `.env.example` for the full list. Key categories:
+See `apps/web/.env.example` for the full list (Next.js & Prisma membaca `apps/web/.env`). Key categories:
 
 | Category | Variables | Description |
 |----------|-----------|-------------|
@@ -491,21 +494,25 @@ flowchart LR
 | Constants | SCREAMING_SNAKE | `MAX_NOTE_LENGTH` |
 | Database tables | snake_case (via Prisma `@@map`) | `transactions` |
 | Routes (URL) | kebab-case | `/transactions`, `/budgets` |
-| Import alias | `~/*` → `src/*` | `import { TransactionForm } from "~/components/transactions/transaction-form"` |
+| Import alias | `~/*` → `apps/web/src/*` | `import { TransactionForm } from "~/components/transactions/transaction-form"` |
 | Lokasi komponen | `~/components/<module>/**` | `~/components/budgets/budget-progress.tsx` |
 
 Struktur folder (acuan):
 ```
-src/
-├── app/                  # Routes (App Router)
-├── components/
-│   ├── ui/               # shadcn/ui
-│   └── <module>/**       # Komponen per modul: layout, auth, transactions, categories, budgets, reports
-├── modules/<domain>/     # Logika server (actions.ts, queries.ts) + schema.ts (Zod, isomorfik: boleh di-import komponen client)
-└── lib/                  # auth, prisma client, format Rupiah, util tanggal
-prisma/                   # schema.prisma, migrations, seed
-test/web/                 # Playwright (struktur HAIE)
-deploy/                   # compose files, Caddyfile, backup script
+apps/
+├── web/                      # package `web` — app Next.js
+│   ├── src/
+│   │   ├── app/              # Routes (App Router)
+│   │   ├── components/
+│   │   │   ├── ui/           # shadcn/ui
+│   │   │   └── <module>/**   # Komponen per modul: layout, auth, transactions, categories, budgets, reports
+│   │   ├── modules/<domain>/ # Logika server (actions.ts, queries.ts) + schema.ts (Zod, isomorfik: boleh di-import komponen client) + unit test
+│   │   └── lib/              # auth, prisma client, format Rupiah, util tanggal
+│   ├── prisma/               # schema.prisma, migrations, seed
+│   └── Dockerfile            # image produksi (build context = root repo)
+└── test/                     # package `e2e` — Playwright
+    └── web/                  # struktur HAIE: features, pages, fixtures, smoke, regression
+deploy/                       # compose files, Caddyfile, backup script
 ```
 
 ### 9.2 Commit Convention
