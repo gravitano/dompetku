@@ -2,7 +2,10 @@ import type { Locator, Page } from "@playwright/test";
 
 import { AppShell } from "./app-shell";
 
-/** Page Object halaman Anggaran + form Atur Anggaran (E03-US01). */
+/**
+ * Page Object halaman Anggaran + form Atur Anggaran (E03-US01) + indikator
+ * pemakaian (E03-US02).
+ */
 export class BudgetsPage {
   readonly shell: AppShell;
   readonly root: Locator;
@@ -28,6 +31,14 @@ export class BudgetsPage {
   readonly deleteTitle: Locator;
   readonly confirmDelete: Locator;
   readonly confirmCancel: Locator;
+  readonly summaryCard: Locator;
+  readonly summarySpent: Locator;
+  readonly summaryPercent: Locator;
+  readonly summaryRemaining: Locator;
+  readonly unbudgetedSection: Locator;
+  readonly notSetSection: Locator;
+  readonly loadError: Locator;
+  readonly retryButton: Locator;
 
   constructor(readonly page: Page) {
     this.shell = new AppShell(page);
@@ -54,6 +65,14 @@ export class BudgetsPage {
     this.deleteTitle = page.getByTestId("budget-delete-title");
     this.confirmDelete = page.getByTestId("confirm-delete-button");
     this.confirmCancel = page.getByTestId("confirm-cancel-button");
+    this.summaryCard = page.getByTestId("budget-summary-card");
+    this.summarySpent = page.getByTestId("budget-summary-spent");
+    this.summaryPercent = page.getByTestId("budget-summary-percent");
+    this.summaryRemaining = page.getByTestId("budget-summary-remaining");
+    this.unbudgetedSection = page.getByTestId("budget-unbudgeted-section");
+    this.notSetSection = page.getByTestId("budget-notset-section");
+    this.loadError = page.getByTestId("budget-load-error");
+    this.retryButton = page.getByTestId("budget-retry-button");
   }
 
   /** Buka `/budgets` (opsional `?month=YYYY-MM`) dan tunggu bulan tsb tampil. */
@@ -91,12 +110,39 @@ export class BudgetsPage {
     return this.page.getByTestId(`budget-row-${slug}-amount`);
   }
 
+  /** Terpakai (E03-US02). */
+  spent(slug: string): Locator {
+    return this.page.getByTestId(`budget-row-${slug}-spent`);
+  }
+
+  percent(slug: string): Locator {
+    return this.page.getByTestId(`budget-row-${slug}-percent`);
+  }
+
+  /** "Sisa Rp X" / "Lebih Rp X". */
+  remaining(slug: string): Locator {
+    return this.page.getByTestId(`budget-row-${slug}-remaining`);
+  }
+
+  /** Tombol "Atur anggaran" di bagian Tanpa anggaran. */
+  setUnbudgeted(slug: string): Locator {
+    return this.page.getByTestId(`budget-unbudgeted-set-${slug}`);
+  }
+
   archivedLabel(slug: string): Locator {
     return this.page.getByTestId(`budget-row-${slug}-archived`);
   }
 
-  /** Nama kategori di daftar, berurutan. */
+  /**
+   * Nama kategori di halaman, berurutan: beranggaran, Tanpa anggaran, lalu
+   * Belum diatur.
+   */
   async names(): Promise<string[]> {
+    return this.root.getByTestId("budget-row-name").allTextContents();
+  }
+
+  /** Nama kategori beranggaran (urut persentase tertinggi). */
+  async budgetedNames(): Promise<string[]> {
     return this.list.getByTestId("budget-row-name").allTextContents();
   }
 
