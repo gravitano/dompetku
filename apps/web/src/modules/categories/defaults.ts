@@ -1,40 +1,22 @@
 /**
- * Kategori bawaan yang di-seed untuk setiap user (ITA §4.2).
+ * Kategori bawaan yang di-seed untuk setiap user (ITA §4.2). Datanya ada di
+ * `./default-categories` (modul murni, juga dipakai fixture E2E).
  *
  * Dipakai oleh:
  * - `prisma/seed.ts` (user demo)
  * - story registrasi (E01-US01) — panggil `seedDefaultCategories(user.id)`
  *   segera setelah user dibuat (mis. di databaseHooks better-auth atau action).
  */
-import type { CategoryType, Prisma } from "~/generated/prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 
-export type DefaultCategory = {
-  name: string;
-  type: CategoryType;
-  icon: string;
-};
+import { DEFAULT_CATEGORIES } from "./default-categories";
 
-export const DEFAULT_EXPENSE_CATEGORIES: readonly DefaultCategory[] = [
-  { name: "Makan & Minum", type: "EXPENSE", icon: "utensils" },
-  { name: "Transportasi", type: "EXPENSE", icon: "bus" },
-  { name: "Belanja", type: "EXPENSE", icon: "shopping-cart" },
-  { name: "Tagihan", type: "EXPENSE", icon: "receipt" },
-  { name: "Hiburan", type: "EXPENSE", icon: "clapperboard" },
-  { name: "Kesehatan", type: "EXPENSE", icon: "heart-pulse" },
-  { name: "Lainnya", type: "EXPENSE", icon: "package" },
-];
-
-export const DEFAULT_INCOME_CATEGORIES: readonly DefaultCategory[] = [
-  { name: "Gaji", type: "INCOME", icon: "wallet" },
-  { name: "Bonus", type: "INCOME", icon: "gift" },
-  { name: "Hadiah", type: "INCOME", icon: "party-popper" },
-  { name: "Lainnya", type: "INCOME", icon: "package" },
-];
-
-export const DEFAULT_CATEGORIES: readonly DefaultCategory[] = [
-  ...DEFAULT_EXPENSE_CATEGORIES,
-  ...DEFAULT_INCOME_CATEGORIES,
-];
+export {
+  DEFAULT_CATEGORIES,
+  DEFAULT_EXPENSE_CATEGORIES,
+  DEFAULT_INCOME_CATEGORIES,
+  type DefaultCategory,
+} from "./default-categories";
 
 /** Client minimal yang dibutuhkan: PrismaClient atau transaction client. */
 export type CategoryDb = { category: Prisma.TransactionClient["category"] };
