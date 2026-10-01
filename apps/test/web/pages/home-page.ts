@@ -1,21 +1,57 @@
 import type { Locator, Page } from "@playwright/test";
 
 /**
- * Page Object Beranda (versi minimal E02-US01/US02: total pemasukan &
- * pengeluaran bulan ini + transaksi terbaru). Selector mengikuti E04-US01 agar
- * bisa dipakai ulang.
+ * Page Object Beranda — dashboard ringkasan bulanan (E04-US01). Selector
+ * mengikuti testing.md E04-US01; `summary-income-total`,
+ * `summary-expense-total`, `recent-transaction-item`, dan
+ * `recent-transactions-empty` juga dipakai spec E02.
  */
 export class HomePage {
+  readonly title: Locator;
+  readonly period: Locator;
   readonly incomeTotal: Locator;
   readonly expenseTotal: Locator;
+  readonly balance: Locator;
+  readonly budgetCard: Locator;
+  readonly budgetText: Locator;
+  readonly budgetPercent: Locator;
+  readonly budgetProgress: Locator;
+  readonly budgetRemaining: Locator;
+  readonly budgetLink: Locator;
+  readonly budgetSetupCta: Locator;
   readonly recentItems: Locator;
+  readonly seeAll: Locator;
+  /** Empty state pengguna baru (tanpa transaksi sama sekali). */
   readonly recentEmpty: Locator;
+  readonly emptyMessage: Locator;
+  readonly emptyCta: Locator;
+  readonly loadError: Locator;
+  readonly retryButton: Locator;
+  readonly alerts: Locator;
+  readonly fab: Locator;
 
   constructor(readonly page: Page) {
+    this.title = page.getByTestId("page-title");
+    this.period = page.getByTestId("dashboard-period");
     this.incomeTotal = page.getByTestId("summary-income-total");
     this.expenseTotal = page.getByTestId("summary-expense-total");
+    this.balance = page.getByTestId("summary-balance");
+    this.budgetCard = page.getByTestId("budget-summary-card");
+    this.budgetText = page.getByTestId("budget-summary-text");
+    this.budgetPercent = page.getByTestId("budget-summary-percent");
+    this.budgetProgress = page.getByTestId("budget-summary-progress");
+    this.budgetRemaining = page.getByTestId("budget-summary-remaining");
+    this.budgetLink = page.getByTestId("budget-summary-link");
+    this.budgetSetupCta = page.getByTestId("budget-setup-cta");
     this.recentItems = page.getByTestId("recent-transaction-item");
+    this.seeAll = page.getByTestId("recent-transactions-see-all");
     this.recentEmpty = page.getByTestId("recent-transactions-empty");
+    this.emptyMessage = page.getByTestId("dashboard-empty-message");
+    this.emptyCta = page.getByTestId("dashboard-empty-cta");
+    this.loadError = page.getByTestId("dashboard-load-error");
+    this.retryButton = page.getByTestId("dashboard-retry-button");
+    this.alerts = page.getByTestId("dashboard-alerts");
+    this.fab = page.getByTestId("fab-add-transaction");
   }
 
   async goto() {
@@ -39,6 +75,11 @@ export class HomePage {
         exact: true,
       }),
     });
+  }
+
+  /** Catatan (atau nama kategori) transaksi terbaru, urut tampilan. */
+  async recentNotes(): Promise<string[]> {
+    return this.recentItems.getByTestId("transaction-note").allInnerTexts();
   }
 }
 
