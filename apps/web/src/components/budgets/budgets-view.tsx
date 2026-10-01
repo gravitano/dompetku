@@ -25,9 +25,20 @@ import {
   budgetsHref,
   isBudgetMonthEditable,
 } from "~/modules/budgets/schema";
-import type { BudgetMonthView, BudgetRow } from "~/modules/budgets/view";
+import {
+  BUDGET_STATUS_COLOR,
+  budgetBalanceLabel,
+} from "~/modules/budgets/status";
+import type {
+  BudgetedRow,
+  BudgetMonthView,
+  BudgetRow,
+} from "~/modules/budgets/view";
 
 import { BudgetFormSheet } from "./budget-form-sheet";
+import { BudgetProgress } from "./budget-progress";
+import { BUDGET_STATUS_CLASS, BudgetStatusIcon } from "./budget-status";
+import { BudgetSummaryCard } from "./budget-summary-card";
 import { BudgetsSkeleton } from "./budgets-skeleton";
 
 type BudgetsViewProps = {
@@ -54,11 +65,13 @@ function shortMonthLabel(month: string): string {
 }
 
 /**
- * Tab **Anggaran** (E03-US01): navigasi bulan (bulan lampau "Hanya lihat",
- * maksimal +1 bulan), kartu Total anggaran, kartu kosong + "Salin dari bulan
- * lalu", dan daftar kategori pengeluaran aktif (tap → form Atur Anggaran).
- * Kategori terarsip yang masih punya anggaran bulan tsb tampil read-only.
- * Bulan tersimpan di URL (`?month=`); setiap mutasi me-revalidate halaman.
+ * Tab **Anggaran** (E03-US01 + indikator E03-US02): navigasi bulan (bulan lampau
+ * "Hanya lihat", maksimal +1 bulan), kartu ringkasan terpakai vs total anggaran,
+ * kartu kosong + "Salin dari bulan lalu", lalu tiga bagian: kategori
+ * beranggaran dengan indikator (persentase tertinggi dulu, tap → form Atur
+ * Anggaran), "Tanpa anggaran" (ada pengeluaran, tombol Atur anggaran), dan
+ * "Belum diatur". Kategori terarsip tampil read-only. Bulan tersimpan di URL
+ * (`?month=`); setiap mutasi (anggaran/transaksi) me-revalidate halaman.
  */
 export function BudgetsView({ data, currentMonth }: BudgetsViewProps) {
   const router = useRouter();
@@ -77,6 +90,7 @@ export function BudgetsView({ data, currentMonth }: BudgetsViewProps) {
   const previousMonth = shiftMonthKey(data.month, -1);
   const empty = data.budgetCount === 0;
   const canCopy = editable && empty && data.copyableFromPrevious > 0;
+  const { budgeted, unbudgeted, notSet } = data.sections;
 
   function navigate(month: string) {
     startTransition(() => {
@@ -152,22 +166,12 @@ export function BudgetsView({ data, currentMonth }: BudgetsViewProps) {
           <BudgetsSkeleton rows={Math.max(data.rows.length, 3)} />
         ) : (
           <>
-            <section
-              aria-label={`${M.totalLabel} ${period}`}
-              className="rounded-xl border bg-card p-4"
-            >
-              <p className="text-sm text-muted-foreground">
-                {M.totalLabel}
-                <span className="sr-only">, {period}</span>
-              </p>
-              <p
-                data-testid="budget-total"
-                data-value={data.total.toString()}
-                className="mt-1 truncate text-2xl font-semibold tabular-nums"
-              >
-                {formatRupiah(data.total)}
-              </p>
-            </section>
+            <BudgetSummaryCard
+              totalBudget={data.total}
+              totalSpent={data.totalSpent}
+              budgetCount={data.budgetCount}
+              period={period}
+            />
 
             {empty ? (
               <section
@@ -205,21 +209,77 @@ export function BudgetsView({ data, currentMonth }: BudgetsViewProps) {
               </section>
             ) : null}
 
-            <ul
-              data-testid="budget-list"
-              aria-label={`Anggaran per kategori, ${period}`}
-              className="divide-y overflow-hidden rounded-xl border bg-card"
-            >
-              {data.rows.map((row) => (
-                <li key={row.categoryId}>
-                  <BudgetRowItem
-                    row={row}
-                    readOnly={!editable || row.archived}
-                    onOpen={() => openForm(row)}
-                  />
-                </li>
-              ))}
-            </ul>
+            {budgeted.length > 0 ? (
+              <ul
+                data-testid="budget-list"
+                aria-label={`Pemakaian anggaran per kategori, ${period}`}
+                className="divide-y overflow-hidden rounded-xl border bg-card"
+              >
+                {budgeted.map((row) => (
+                  <li key={row.categoryId}>
+                    <BudgetRowItem
+                      row={row}
+                      readOnly={!editable || row.archived}
+                      onOpen={() => openForm(row)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {unbudgeted.length > 0 ? (
+              <section
+                data-testid="budget-unbudgeted-section"
+                aria-labelledby="budget-unbudgeted-title"
+                className="flex flex-col gap-2"
+              >
+                <h2
+                  id="budget-unbudgeted-title"
+                  className="px-1 text-sm font-semibold text-muted-foreground"
+                >
+                  {M.unbudgetedTitle}
+                </h2>
+                <ul className="divide-y overflow-hidden rounded-xl border bg-card">
+                  {unbudgeted.map((row) => (
+                    <li key={row.categoryId}>
+                      <UnbudgetedRowItem
+                        row={row}
+                        canSet={editable && !row.archived}
+                        onSet={() => openForm(row)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {notSet.length > 0 ? (
+              <section
+                data-testid="budget-notset-section"
+                aria-label={`${M.notSetTitle}, ${period}`}
+                className="flex flex-col gap-2"
+              >
+                {budgeted.length + unbudgeted.length > 0 ? (
+                  <h2
+                    aria-hidden
+                    className="px-1 text-sm font-semibold text-muted-foreground"
+                  >
+                    {M.notSetTitle}
+                  </h2>
+                ) : null}
+                <ul className="divide-y overflow-hidden rounded-xl border bg-card">
+                  {notSet.map((row) => (
+                    <li key={row.categoryId}>
+                      <BudgetRowItem
+                        row={row}
+                        readOnly={!editable || row.archived}
+                        onOpen={() => openForm(row)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
           </>
         )}
       </div>
@@ -239,52 +299,128 @@ export function BudgetsView({ data, currentMonth }: BudgetsViewProps) {
   );
 }
 
+function RowIcon({ row }: { row: BudgetRow }) {
+  return (
+    <span
+      className={cn(
+        "flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground",
+        row.archived && "opacity-60",
+      )}
+    >
+      <CategoryIcon icon={row.icon} />
+    </span>
+  );
+}
+
+function RowName({ row }: { row: BudgetRow }) {
+  return (
+    <span
+      data-testid="budget-row-name"
+      className={cn("truncate font-medium", row.archived && "opacity-60")}
+    >
+      {row.name}
+    </span>
+  );
+}
+
+function ArchivedLabel({ row }: { row: BudgetRow }) {
+  return row.archived ? (
+    <span
+      data-testid={`budget-row-${row.slug}-archived`}
+      className="shrink-0 text-xs text-muted-foreground"
+    >
+      {M.archived}
+    </span>
+  ) : null;
+}
+
+/** Isi baris beranggaran + indikator pemakaian (E03-US02 UX-02). */
+function BudgetedRowContent({ row }: { row: BudgetedRow }) {
+  const { usage } = row;
+  const tone = BUDGET_STATUS_CLASS[usage.status].text;
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <span className="flex items-center gap-2">
+        <BudgetStatusIcon
+          status={usage.status}
+          testId={`budget-row-${row.slug}-status`}
+        />
+        <RowName row={row} />
+        <ArchivedLabel row={row} />
+        <span
+          data-testid={`budget-row-${row.slug}-percent`}
+          className={cn("ml-auto shrink-0 font-semibold tabular-nums", tone)}
+        >
+          {usage.percent}%
+        </span>
+      </span>
+      <BudgetProgress
+        usage={usage}
+        label={`Pemakaian anggaran ${row.name}`}
+        testId={`budget-row-${row.slug}-progress`}
+      />
+      <span className="flex flex-wrap items-center justify-between gap-x-3 text-xs text-muted-foreground tabular-nums">
+        <span>
+          <span data-testid={`budget-row-${row.slug}-spent`}>
+            {formatRupiah(usage.spent)}
+          </span>{" "}
+          /{" "}
+          <span data-testid={`budget-row-${row.slug}-amount`}>
+            {formatRupiah(row.amount)}
+          </span>
+        </span>
+        <span
+          data-testid={`budget-row-${row.slug}-remaining`}
+          className={cn(usage.overBy > BigInt(0) && cn("font-medium", tone))}
+        >
+          {budgetBalanceLabel(usage)}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/** Isi baris "Belum diatur" (E03-US01). */
+function NotSetRowContent({ row }: { row: BudgetRow }) {
+  return (
+    <>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <RowName row={row} />
+        <ArchivedLabel row={row} />
+      </span>
+      <span
+        data-testid={`budget-row-${row.slug}-amount`}
+        className="shrink-0 text-sm text-muted-foreground tabular-nums"
+      >
+        {M.notSet}
+      </span>
+    </>
+  );
+}
+
+/**
+ * Baris kategori: beranggaran (indikator) atau "Belum diatur". Bisa ditap
+ * untuk membuka form Atur Anggaran kecuali `readOnly` (bulan lampau / kategori
+ * terarsip).
+ */
 function BudgetRowItem({
   row,
   readOnly,
   onOpen,
 }: {
-  row: BudgetRow;
+  row: BudgetRow | BudgetedRow;
   readOnly: boolean;
   onOpen: () => void;
 }) {
+  const budgeted = "usage" in row ? row : null;
   const content = (
     <>
-      <span
-        className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground",
-          row.archived && "opacity-60",
-        )}
-      >
-        <CategoryIcon icon={row.icon} />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span
-          data-testid="budget-row-name"
-          className={cn("truncate font-medium", row.archived && "opacity-60")}
-        >
-          {row.name}
-        </span>
-        {row.archived ? (
-          <span
-            data-testid={`budget-row-${row.slug}-archived`}
-            className="text-xs text-muted-foreground"
-          >
-            {M.archived}
-          </span>
-        ) : null}
-      </span>
-      <span
-        data-testid={`budget-row-${row.slug}-amount`}
-        className={cn(
-          "shrink-0 tabular-nums",
-          row.amount === null
-            ? "text-sm text-muted-foreground"
-            : "font-semibold",
-        )}
-      >
-        {row.amount === null ? M.notSet : formatRupiah(row.amount)}
-      </span>
+      <RowIcon row={row} />
+      {budgeted ? (
+        <BudgetedRowContent row={budgeted} />
+      ) : (
+        <NotSetRowContent row={row} />
+      )}
       {readOnly ? null : (
         <ChevronRightIcon
           className="size-4 shrink-0 text-muted-foreground"
@@ -299,6 +435,10 @@ function BudgetRowItem({
     "data-budget-set": row.amount !== null,
     "data-archived": row.archived,
     "data-readonly": readOnly,
+    "data-status": budgeted
+      ? BUDGET_STATUS_COLOR[budgeted.usage.status]
+      : undefined,
+    "data-percent": budgeted ? budgeted.usage.percent : undefined,
     className: "flex w-full items-center gap-3 px-3 py-3 text-left",
   };
 
@@ -321,5 +461,54 @@ function BudgetRowItem({
     >
       {content}
     </button>
+  );
+}
+
+/**
+ * Baris bagian "Tanpa anggaran" (E03-US02 UX-03): pengeluaran kategori tanpa
+ * anggaran + tombol "Atur anggaran" (bulan berjalan/depan, kategori aktif).
+ */
+function UnbudgetedRowItem({
+  row,
+  canSet,
+  onSet,
+}: {
+  row: BudgetRow;
+  canSet: boolean;
+  onSet: () => void;
+}) {
+  return (
+    <div
+      data-testid={`budget-row-${row.slug}`}
+      data-budget-set="false"
+      data-archived={row.archived}
+      data-readonly={!canSet}
+      className="flex w-full items-center gap-3 px-3 py-3"
+    >
+      <RowIcon row={row} />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <RowName row={row} />
+        <ArchivedLabel row={row} />
+      </span>
+      <span
+        data-testid={`budget-row-${row.slug}-spent`}
+        className="shrink-0 font-semibold tabular-nums"
+      >
+        {formatRupiah(row.spent)}
+      </span>
+      {canSet ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid={`budget-unbudgeted-set-${row.slug}`}
+          aria-label={`${M.setBudget} ${row.name}`}
+          className="shrink-0"
+          onClick={onSet}
+        >
+          {M.setBudget}
+        </Button>
+      ) : null}
+    </div>
   );
 }
