@@ -1,6 +1,6 @@
 ---
 haie_story: docs/features/phase-01-mvp/e-03---anggaran/e03-us02--indikator-pemakaian-anggaran---story.md
-status: in-progress
+status: implemented
 branch: dev/e03-us02--indikator-pemakaian-anggaran
 ---
 
