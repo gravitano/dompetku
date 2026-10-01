@@ -151,15 +151,43 @@ test.describe("Indikator pemakaian anggaran", () => {
           "data-value",
           String(Math.min(Number.parseInt(example.percent), 100)),
         );
-        // Status tidak hanya warna: ikon/label status untuk pembaca layar.
-        await expect(
-          budgets.page.getByTestId("budget-row-transportasi-status"),
-        ).toHaveAttribute(
-          "data-status-label",
-          { green: "Aman", yellow: "Hampir habis", red: "Terlampaui" }[
-            example.status
-          ],
+        // Status tidak hanya warna: ikon + teks status (terlihat untuk
+        // Hampir habis/Terlampaui, hanya pembaca layar untuk Aman).
+        const label = {
+          green: "Aman",
+          yellow: "Hampir habis",
+          red: "Terlampaui",
+        }[example.status];
+        const status = budgets.page.getByTestId(
+          "budget-row-transportasi-status",
         );
+        await expect(status).toHaveAttribute("data-status-label", label);
+        const statusLabel = budgets.page.getByTestId(
+          "budget-row-transportasi-status-label",
+        );
+        await expect(statusLabel).toHaveText(label);
+        if (example.status === "green") {
+          await expect(statusLabel).toHaveClass(/sr-only/);
+        } else {
+          await expect(statusLabel).toBeVisible();
+          await expect(statusLabel).not.toHaveClass(/sr-only/);
+        }
+        // Warna "Sisa/Lebih" mengikuti status (tepat 100% "Sisa Rp 0" merah).
+        await expect(budgets.remaining("transportasi")).toHaveAttribute(
+          "data-tone",
+          { green: "muted", yellow: "yellow", red: "red" }[example.status],
+        );
+        // Kartu ringkasan memakai aturan warna yang sama.
+        await expect(budgets.summaryRemaining).toHaveText(example.text);
+        await expect(budgets.summaryRemaining).toHaveAttribute(
+          "data-tone",
+          { green: "muted", yellow: "yellow", red: "red" }[example.status],
+        );
+        if (example.status !== "green") {
+          await expect(
+            budgets.page.getByTestId("budget-summary-status-label"),
+          ).toBeVisible();
+        }
       });
     }
 

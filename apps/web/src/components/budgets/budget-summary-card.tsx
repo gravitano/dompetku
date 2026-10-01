@@ -8,7 +8,11 @@ import {
 } from "~/modules/budgets/status";
 
 import { BudgetProgress } from "./budget-progress";
-import { BUDGET_STATUS_CLASS, BudgetStatusIcon } from "./budget-status";
+import {
+  BUDGET_STATUS_CLASS,
+  budgetBalanceTone,
+  BudgetStatusIcon,
+} from "./budget-status";
 
 /**
  * Kartu ringkasan halaman Anggaran (E03-US02 UX-01): "Terpakai Rp X dari Rp Y"
@@ -70,6 +74,7 @@ export function BudgetSummaryCard({
 
   const usage = budgetUsage(totalSpent, totalBudget);
   const tone = BUDGET_STATUS_CLASS[usage.status].text;
+  const balanceTone = budgetBalanceTone(usage.status);
   return (
     <section
       data-testid="budget-summary-card"
@@ -95,7 +100,10 @@ export function BudgetSummaryCard({
             tone,
           )}
         >
-          <BudgetStatusIcon status={usage.status} />
+          <BudgetStatusIcon
+            status={usage.status}
+            testId="budget-summary-status"
+          />
           <span data-testid="budget-summary-percent">{usage.percent}%</span>
         </span>
       </div>
@@ -106,9 +114,10 @@ export function BudgetSummaryCard({
       />
       <p
         data-testid="budget-summary-remaining"
+        data-tone={balanceTone.tone}
         className={cn(
           "text-sm font-medium tabular-nums",
-          usage.overBy > BigInt(0) ? tone : "text-muted-foreground",
+          balanceTone.className,
         )}
       >
         {budgetBalanceLabel(usage)}
