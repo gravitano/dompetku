@@ -61,19 +61,39 @@ describe("getBudgetMonth", () => {
       { categoryId: "hobi", amount: BigInt(200_000) },
     ]);
     mocks.budgetCount.mockResolvedValue(3);
+    mocks.transactionGroupBy.mockResolvedValue([
+      { categoryId: "makan", _sum: { amount: BigInt(1_680_000) } },
+      { categoryId: "lain-terarsip", _sum: { amount: BigInt(20_000) } },
+    ]);
 
     const view = await getBudgetMonth("user-budi", "2026-10");
 
     expect(view).toMatchObject({
       month: "2026-10",
       total: BigInt(1_700_000),
+      // Seluruh pengeluaran bulan tsb, termasuk kategori tanpa anggaran.
+      totalSpent: BigInt(1_700_000),
       budgetCount: 2,
       copyableFromPrevious: 3,
     });
-    expect(view.rows.map((r) => [r.slug, r.archived])).toEqual([
-      ["makan-minum", false],
-      ["hobi", true],
+    expect(view.rows.map((r) => [r.slug, r.archived, r.spent])).toEqual([
+      ["makan-minum", false, BigInt(1_680_000)],
+      ["hobi", true, BigInt(0)],
     ]);
+    expect(view.sections.budgeted.map((r) => [r.slug, r.usage.status])).toEqual(
+      [
+        ["makan-minum", "over"],
+        ["hobi", "safe"],
+      ],
+    );
+    expect(mocks.transactionGroupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: "user-budi",
+          type: "EXPENSE",
+        }),
+      }),
+    );
     expect(mocks.categoryFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: "user-budi", type: "EXPENSE" },
