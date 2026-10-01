@@ -79,7 +79,8 @@ type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
  * kategori tujuan (E03-US03): hanya pengeluaran bertanggal bulan berjalan
  * (Asia/Jakarta) dan kategori yang punya anggaran bulan itu. Total pengeluaran
  * kategori dihitung sebelum & sesudah `write` di transaksi yang sama; status
- * yang naik level menghasilkan `budgetAlert`. Hapus tidak memakai ini.
+ * yang naik level menghasilkan `budgetAlert`. Pemasukan / bulan lain ditulis
+ * langsung tanpa transaksi interaktif. Hapus tidak memakai ini.
  */
 async function saveWithBudgetAlert<T>(
   userId: string,
@@ -91,10 +92,17 @@ async function saveWithBudgetAlert<T>(
     target.type === "EXPENSE" &&
     month.getTime() === currentMonthStart().getTime();
 
+  // Tidak ada yang dipantau (pemasukan / bulan lain): tulis langsung tanpa
+  // membuka transaksi interaktif.
+  if (!watched) return { result: await write(prisma), budgetAlert: null };
+
   return prisma.$transaction(async (tx) => {
-    const before = watched
-      ? await getCategoryBudgetSpend(tx, userId, target.categoryId, month)
-      : null;
+    const before = await getCategoryBudgetSpend(
+      tx,
+      userId,
+      target.categoryId,
+      month,
+    );
     const result = await write(tx);
     if (!before) return { result, budgetAlert: null };
     const spentAfter = await getCategorySpent(
