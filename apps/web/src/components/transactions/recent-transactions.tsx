@@ -1,3 +1,4 @@
+import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
 
 import { CategoryIcon } from "~/components/categories/category-icon";
@@ -14,35 +15,45 @@ const SHORT_DATE = new Intl.DateTimeFormat("id-ID", {
 });
 
 type RecentTransactionsProps = {
+  /** Tidak kosong — empty state ditangani pemanggil (Beranda E04-US01). */
   transactions: readonly RecentTransaction[];
   title?: string;
+  /** Tujuan link "Lihat semua" di judul bagian (tab Transaksi, UX-03). */
+  seeAllHref?: string;
 };
 
 /**
- * Daftar transaksi terbaru (versi minimal E02-US01). Tap baris membuka detail
- * (E02-US04, `?from=home` → tutup kembali ke Beranda). Diperluas oleh
- * E04-US01 (dashboard).
+ * Daftar transaksi terbaru di Beranda (E04-US01 AC 6–7, UX-03/UX-04): ikon
+ * kategori, catatan (atau nama kategori), tanggal, nominal bertanda. Tap baris
+ * membuka detail (E02-US04, `?from=home` → tutup kembali ke Beranda).
  */
 export function RecentTransactions({
   transactions,
   title = "Transaksi terbaru",
+  seeAllHref,
 }: RecentTransactionsProps) {
   return (
     <section aria-labelledby="recent-transactions-title" className="mt-6">
-      <h2
-        id="recent-transactions-title"
-        className="mb-2 text-sm font-medium text-muted-foreground"
-      >
-        {title}
-      </h2>
-      {transactions.length === 0 ? (
-        <p
-          data-testid="recent-transactions-empty"
-          className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground"
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2
+          id="recent-transactions-title"
+          className="text-sm font-medium text-muted-foreground"
         >
-          Belum ada transaksi. Tekan tombol + untuk mencatat.
-        </p>
-      ) : (
+          {title}
+        </h2>
+        {seeAllHref ? (
+          <Link
+            href={seeAllHref}
+            data-testid="recent-transactions-see-all"
+            className="flex shrink-0 items-center gap-0.5 rounded-sm text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Lihat semua
+            <span className="sr-only"> transaksi</span>
+            <ChevronRightIcon className="size-4" aria-hidden />
+          </Link>
+        ) : null}
+      </div>
+      {transactions.length === 0 ? null : (
         <ul
           data-testid="recent-transactions"
           className="divide-y overflow-hidden rounded-xl border bg-card"
