@@ -6,6 +6,25 @@ Dokumen acuan: [`docs/project/03-ITA.md`](docs/project/03-ITA.md) (arsitektur, s
 
 **Stack:** Next.js (App Router, TypeScript) · PostgreSQL + Prisma · better-auth · Tailwind CSS + shadcn/ui · Vitest · Playwright.
 
+## Tentang demo ini
+
+DompetKu adalah aplikasi contoh untuk webinar **HAIE** (framework Spec-Driven Development GITS.ID) dan **FRIDAY** (workflow developer berbasis Claude Code). Seluruh isi repo, dari dokumen bisnis sampai kode dan test, dihasilkan lewat alur tersebut dengan AI sebagai pair.
+
+- **Live demo:** https://dompetku-sooty.vercel.app — masuk dengan `budi@example.com` / `Password123` (akun demo publik, data contoh).
+- **Status:** Sprint 1 selesai (7 story: akun, catat/daftar/ubah/hapus transaksi, kelola kategori). Sprint 2 (Anggaran, Laporan & Grafik) sudah punya spec, belum diimplementasikan.
+
+Telusuri alurnya dari spesifikasi ke kode:
+
+| Tahap                                                       | Lokasi                                                                                          |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Kebutuhan bisnis, rencana, arsitektur                       | [`docs/project/`](docs/project/) — BRD, PEP, ITA                                                |
+| Spec per story (story, design + wireframe, testing Gherkin) | [`docs/features/phase-01-mvp/`](docs/features/phase-01-mvp/)                                    |
+| Proposal implementasi per story                             | [`openspec/proposals/`](openspec/proposals/)                                                    |
+| Implementasi per story                                      | `git log --first-parent development` — satu merge per story, commit ber-footer `HAIE: <story>`  |
+| Test otomatis dari skenario Gherkin                         | [`apps/test/web/features/`](apps/test/web/features/) (E2E) dan `*.test.ts` di `apps/web` (unit) |
+
+Tooling HAIE/FRIDAY sendiri (skill, template, CLI) tidak termasuk di repo ini; yang ada adalah hasilnya.
+
 Repo ini monorepo **pnpm workspaces**: app Next.js di `apps/web` (package `web`), E2E Playwright di `apps/test` (package `e2e`). Semua perintah dijalankan dari **root**; script root meneruskannya ke package terkait (`pnpm --filter web …` / `pnpm --filter e2e …`).
 
 ## Quick start
@@ -14,7 +33,7 @@ Butuh Node.js ≥ 22, pnpm, dan Docker.
 
 ```bash
 # 1. Clone & setup
-git clone git@github.com:gravitano/dompetku.git
+git clone https://github.com/gravitano/dompetku.git
 cd dompetku
 cp apps/web/.env.example apps/web/.env   # isi BETTER_AUTH_SECRET: openssl rand -base64 32
 pnpm install                             # dari root, untuk semua package
