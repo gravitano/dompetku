@@ -48,7 +48,10 @@ export class BudgetsPage {
     this.monthNext = page.getByTestId("budget-month-next");
     this.monthLabel = page.getByTestId("budget-month-label");
     this.readonlyLabel = page.getByTestId("budget-readonly-label");
-    this.total = page.getByTestId("budget-total");
+    // Di-scope ke halaman Anggaran: Beranda memakai test id ringkasan yang
+    // sama, dan halaman sebelumnya bisa masih ada (tersembunyi) di DOM
+    // sesaat setelah navigasi client.
+    this.total = this.root.getByTestId("budget-total");
     this.list = page.getByTestId("budget-list");
     this.emptyState = page.getByTestId("budget-empty-state");
     this.copyButton = page.getByTestId("budget-copy-previous-button");
@@ -65,10 +68,10 @@ export class BudgetsPage {
     this.deleteTitle = page.getByTestId("budget-delete-title");
     this.confirmDelete = page.getByTestId("confirm-delete-button");
     this.confirmCancel = page.getByTestId("confirm-cancel-button");
-    this.summaryCard = page.getByTestId("budget-summary-card");
-    this.summarySpent = page.getByTestId("budget-summary-spent");
-    this.summaryPercent = page.getByTestId("budget-summary-percent");
-    this.summaryRemaining = page.getByTestId("budget-summary-remaining");
+    this.summaryCard = this.root.getByTestId("budget-summary-card");
+    this.summarySpent = this.root.getByTestId("budget-summary-spent");
+    this.summaryPercent = this.root.getByTestId("budget-summary-percent");
+    this.summaryRemaining = this.root.getByTestId("budget-summary-remaining");
     this.unbudgetedSection = page.getByTestId("budget-unbudgeted-section");
     this.notSetSection = page.getByTestId("budget-notset-section");
     this.loadError = page.getByTestId("budget-load-error");
