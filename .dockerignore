@@ -1,17 +1,23 @@
+# Build context = root repo (lihat apps/web/Dockerfile).
 .git
 .github
-.next
-node_modules
-src/generated
+**/.next
+**/node_modules
+**/*.tsbuildinfo
+apps/web/src/generated
+# Package e2e tidak masuk image; package.json-nya tetap disalin agar
+# `pnpm install --frozen-lockfile --filter web` konsisten dengan lockfile.
+apps/test/*
+!apps/test/package.json
 coverage
 playwright-report
 test-results
-test
 docs
+openspec
 .haie
 .claude
 deploy
-.env
-.env.*
-!.env.example
+**/.env
+**/.env.*
+!**/.env.example
 *.md

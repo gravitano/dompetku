@@ -1,4 +1,4 @@
-# Development lokal: hanya database. Jalankan app dengan `pnpm dev`.
+# Development lokal: hanya database. Jalankan app dengan `pnpm dev` (dari root; app di apps/web).
 #   docker compose up -d db
 services:
   db:

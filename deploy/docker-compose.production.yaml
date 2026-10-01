@@ -2,6 +2,8 @@
 #   docker compose -p dompetku-prod -f deploy/docker-compose.production.yaml --env-file deploy/.env.production up -d
 # Secret (DATABASE_URL, BETTER_AUTH_SECRET, POSTGRES_PASSWORD, S3_*) hanya di
 # file .env.production di VPS — tidak pernah di repo.
+# Image app & migrate dibangun dari root repo (monorepo pnpm):
+#   docker build -f apps/web/Dockerfile [--target migrate] .
 name: dompetku-prod
 
 services:
