@@ -28,6 +28,12 @@
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-expense: var(--expense);
+  --color-budget-safe: var(--budget-safe);
+  --color-budget-safe-text: var(--budget-safe-text);
+  --color-budget-warning: var(--budget-warning);
+  --color-budget-warning-text: var(--budget-warning-text);
+  --color-budget-over: var(--budget-over);
+  --color-budget-over-text: var(--budget-over-text);
   --color-income: var(--income);
   --color-income-action: var(--income-action);
   --color-income-action-foreground: var(--income-action-foreground);
@@ -70,6 +76,13 @@
   --destructive: oklch(0.577 0.245 27.325);
   /* Nominal transaksi: pengeluaran merah, pemasukan hijau (E02-US01/US02). */
   --expense: oklch(0.577 0.245 27.325);
+  /* Status anggaran (E03-US02): bar + teks (kontras AA di latar terang). */
+  --budget-safe: oklch(0.696 0.17 162.48);
+  --budget-safe-text: oklch(0.508 0.118 165.612);
+  --budget-warning: oklch(0.769 0.188 70.08);
+  --budget-warning-text: oklch(0.555 0.163 48.998);
+  --budget-over: oklch(0.577 0.245 27.325);
+  --budget-over-text: oklch(0.577 0.245 27.325);
   --income: oklch(0.596 0.145 163.225);
   /* Latar tombol aksi pemasukan (Simpan hijau, E02-US02): kontras teks ≥ 4.5:1. */
   --income-action: oklch(0.508 0.118 165.612);
@@ -110,6 +123,12 @@
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --expense: oklch(0.704 0.191 22.216);
+  --budget-safe: oklch(0.765 0.177 163.223);
+  --budget-safe-text: oklch(0.765 0.177 163.223);
+  --budget-warning: oklch(0.828 0.189 84.429);
+  --budget-warning-text: oklch(0.828 0.189 84.429);
+  --budget-over: oklch(0.704 0.191 22.216);
+  --budget-over-text: oklch(0.704 0.191 22.216);
   --income: oklch(0.765 0.177 163.223);
   --income-action: oklch(0.765 0.177 163.223);
   --income-action-foreground: oklch(0.205 0 0);

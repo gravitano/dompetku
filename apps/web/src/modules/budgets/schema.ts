@@ -43,6 +43,14 @@ export const BUDGET_MESSAGES = {
   emptyHint: "Tap kategori untuk mengatur anggaran",
   copyButton: "Salin dari bulan lalu",
   totalLabel: "Total anggaran",
+  // E03-US02 — indikator pemakaian
+  summaryLabel: "Pemakaian anggaran",
+  spentLabel: "Terpakai",
+  unbudgetedTitle: "Tanpa anggaran",
+  notSetTitle: "Belum diatur",
+  setBudget: "Atur anggaran",
+  loadError: "Gagal memuat anggaran. Coba lagi.",
+  retry: "Coba lagi",
 } as const;
 
 const monthKeySchema = z

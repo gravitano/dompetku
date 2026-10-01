@@ -5,7 +5,9 @@ import { prisma } from "~/lib/prisma";
 
 import {
   buildBudgetRows,
+  groupBudgetRows,
   sumBudgets,
+  sumSpent,
   type BudgetMonthView,
   type MonthBudget,
 } from "./view";
@@ -26,16 +28,16 @@ export async function getMonthBudgets(
 }
 
 /**
- * Data halaman Anggaran bulan `month`: baris kategori, total, dan jumlah
- * anggaran bulan lalu yang bisa disalin (kategori aktif). `userId` dari
- * session.
+ * Data halaman Anggaran bulan `month`: baris kategori + pemakaiannya (E03-US02),
+ * total anggaran, total seluruh pengeluaran, dan jumlah anggaran bulan lalu
+ * yang bisa disalin (kategori aktif). `userId` dari session.
  */
 export async function getBudgetMonth(
   userId: string,
   month: string,
 ): Promise<BudgetMonthView> {
   const previous = parseMonthKey(shiftMonthKey(month, -1));
-  const [categories, budgets, copyableFromPrevious] = await Promise.all([
+  const [categories, budgets, spent, copyableFromPrevious] = await Promise.all([
     prisma.category.findMany({
       where: { userId, type: "EXPENSE" },
       select: {
@@ -48,6 +50,7 @@ export async function getBudgetMonth(
       },
     }),
     getMonthBudgets(userId, month),
+    getMonthExpenseByCategory(userId, month),
     prisma.budget.count({
       where: {
         userId,
@@ -57,10 +60,13 @@ export async function getBudgetMonth(
     }),
   ]);
 
+  const rows = buildBudgetRows(categories, budgets, spent);
   return {
     month,
-    rows: buildBudgetRows(categories, budgets),
+    rows,
+    sections: groupBudgetRows(rows),
     total: sumBudgets(budgets),
+    totalSpent: sumSpent(spent),
     budgetCount: budgets.length,
     copyableFromPrevious,
   };

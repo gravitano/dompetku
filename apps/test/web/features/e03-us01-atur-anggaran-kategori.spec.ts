@@ -327,8 +327,9 @@ test.describe("Atur anggaran kategori", () => {
       await expect(budgets.row("gaji")).toHaveCount(0);
       await expect(budgets.row("hobi")).toHaveCount(0);
 
-      // Keputusan PO: anggaran yang sudah ada tetap tampil (Diarsipkan).
-      expect(names.at(-1)).toBe("Game");
+      // Keputusan PO: anggaran yang sudah ada tetap tampil (Diarsipkan) — sejak
+      // E03-US02 di daftar beranggaran; seri persentase → kategori aktif dulu.
+      expect(await budgets.budgetedNames()).toEqual(["Makan & Minum", "Game"]);
       await expect(budgets.archivedLabel("game")).toHaveText("Diarsipkan");
       await expect(budgets.amount("game")).toHaveText("Rp 200.000");
       await expect(budgets.row("game")).toHaveAttribute(

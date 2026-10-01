@@ -74,6 +74,11 @@ export default defineConfig({
           // memakai `DEMO_MODE` dari `apps/web/.env` (default "false");
           // override lewat `E2E_DEMO_MODE` bila perlu.
           DEMO_MODE: process.env.E2E_DEMO_MODE ?? "true",
+          // Simulasi kegagalan server lewat cookie `e2e-fault` (skenario
+          // @error-handling, `apps/web/src/lib/fault-injection.ts`). Server
+          // yang dipakai ulang (`reuseExistingServer`) harus di-start dengan
+          // env yang sama agar skenario tsb lulus.
+          E2E_FAULT_INJECTION: "true",
           ...(process.env.DATABASE_URL
             ? { DATABASE_URL: process.env.DATABASE_URL }
             : {}),
