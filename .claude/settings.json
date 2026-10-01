@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".haie/scripts/guard-db-access.sh"
+            "command": "sh -c 'if [ -x .haie/scripts/guard-db-access.sh ]; then exec .haie/scripts/guard-db-access.sh; fi'"
           }
         ]
       }
