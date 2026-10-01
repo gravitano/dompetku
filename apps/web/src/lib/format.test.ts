@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   AMOUNT_INPUT_MAX_DIGITS,
   formatAmountInput,
+  formatPercentTenths,
   formatRupiah,
+  formatRupiahShort,
   getInitials,
   parseAmountInput,
 } from "./format";
@@ -101,5 +103,41 @@ describe("formatAmountInput", () => {
     ["1000000001", "Rp 1.000.000.001"],
   ])("%j → %j", (input, expected) => {
     expect(formatAmountInput(input)).toBe(expected);
+  });
+});
+
+describe("formatRupiahShort (label chart E04-US02)", () => {
+  it.each([
+    [0, "Rp 0"],
+    [900, "Rp 900"],
+    [1_000, "Rp 1 rb"],
+    [25_000, "Rp 25 rb"],
+    [500_000, "Rp 500 rb"],
+    [999_400, "Rp 999,4 rb"],
+    [999_960, "Rp 1 jt"],
+    [1_000_000, "Rp 1 jt"],
+    [1_250_000, "Rp 1,3 jt"],
+    [1_240_000, "Rp 1,2 jt"],
+    [2_000_000, "Rp 2 jt"],
+    [12_345_678, "Rp 12,3 jt"],
+    [1_500_000_000, "Rp 1,5 M"],
+    [2_000_000_000_000, "Rp 2 T"],
+    [1_234_000_000_000_000, "Rp 1.234 T"],
+    [-1_500_000, "-Rp 1,5 jt"],
+  ])("%d → %s", (value, expected) => {
+    expect(formatRupiahShort(value)).toBe(expected);
+    expect(formatRupiahShort(BigInt(value))).toBe(expected);
+  });
+});
+
+describe("formatPercentTenths", () => {
+  it.each([
+    [0, "0,0%"],
+    [5, "0,5%"],
+    [125, "12,5%"],
+    [333, "33,3%"],
+    [1000, "100,0%"],
+  ])("%d → %s", (tenths, expected) => {
+    expect(formatPercentTenths(tenths)).toBe(expected);
   });
 });
