@@ -10,8 +10,19 @@ Dokumen acuan: [`docs/project/03-ITA.md`](docs/project/03-ITA.md) (arsitektur, s
 
 DompetKu adalah aplikasi contoh untuk webinar **HAIE** (framework Spec-Driven Development GITS.ID) dan **FRIDAY** (workflow developer berbasis Claude Code). Seluruh isi repo, dari dokumen bisnis sampai kode dan test, dihasilkan lewat alur tersebut dengan AI sebagai pair.
 
-- **Live demo:** https://dompetku-sooty.vercel.app — masuk dengan `budi@example.com` / `Password123` (akun demo publik, data contoh).
+- **Live demo:** https://dompetku-sooty.vercel.app — halaman login menampilkan kotak info **Akun demo**; klik **Pakai akun demo** untuk mengisi email & password, lalu **Masuk** (akun publik, data contoh).
 - **Status:** Sprint 1 selesai (7 story: akun, catat/daftar/ubah/hapus transaksi, kelola kategori). Sprint 2 (Anggaran, Laporan & Grafik) sudah punya spec, belum diimplementasikan.
+
+Akun demo — semua dibuat oleh `pnpm db:seed`, password `Password123`:
+
+| Email              | Keterangan                                       |
+| ------------------ | ------------------------------------------------ |
+| `budi@example.com` | Akun utama demo, punya 8 transaksi contoh        |
+| `ani@example.com`  | Akun kedua — untuk uji isolasi data antar user   |
+| `baru@example.com` | Pengguna baru tanpa transaksi (empty state)      |
+| `lock@example.com` | Khusus E2E skenario lockout, jangan dipakai demo |
+
+Kotak info akun demo di halaman login hanya tampil bila env server `DEMO_MODE=true` (default `false`, lihat `apps/web/.env.example`).
 
 Telusuri alurnya dari spesifikasi ke kode:
 
@@ -47,7 +58,7 @@ pnpm dev
 # 3. Buka http://localhost:3000
 ```
 
-Akun demo (dari `pnpm db:seed`, password `Password123`): `budi@example.com`, `ani@example.com`, `lock@example.com`, `baru@example.com`.
+Akun demo (dari `pnpm db:seed`, password `Password123`): lihat tabel di [Tentang demo ini](#tentang-demo-ini). Set `DEMO_MODE=true` di `apps/web/.env` untuk menampilkan kotak akun demo di halaman login.
 
 ## Perintah
 

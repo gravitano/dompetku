@@ -70,6 +70,10 @@ export default defineConfig({
           // URL publik app harus sama dengan origin yang diuji (better-auth).
           BETTER_AUTH_URL: baseURL,
           APP_URL: baseURL,
+          // Kotak "Akun demo" di /login ikut diuji (spec akun demo). Tidak
+          // memakai `DEMO_MODE` dari `apps/web/.env` (default "false");
+          // override lewat `E2E_DEMO_MODE` bila perlu.
+          DEMO_MODE: process.env.E2E_DEMO_MODE ?? "true",
           ...(process.env.DATABASE_URL
             ? { DATABASE_URL: process.env.DATABASE_URL }
             : {}),
